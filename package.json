@@ -1,0 +1,84 @@
+{
+  "name": "grctool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GRC evidence collection workspace for NIST SP 800-53 Rev 5 with the VA 6500 overlay",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --build && vite build",
+    "typecheck": "tsc --build",
+    "check:baseline": "node scripts/check-baseline.mjs",
+    "catalog:csf": "node --use-system-ca scripts/fetch-csf-guidance.mjs",
+    "check:roundtrip": "rolldown scripts/check-roundtrip.ts --platform node --format esm --file node_modules/.tmp/check-roundtrip.mjs && node node_modules/.tmp/check-roundtrip.mjs",
+    "check": "npm run typecheck && npm run check:baseline && npm run check:roundtrip",
+    "preview": "vite preview",
+    "package": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^7.0.0",
+    "@azure/openai": "^2.0.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@lexical/list": "^0.51.0",
+    "@lexical/markdown": "^0.51.0",
+    "@lexical/react": "^0.51.0",
+    "@lexical/rich-text": "^0.51.0",
+    "@lexical/utils": "^0.51.0",
+    "@mui/icons-material": "^9.4.0",
+    "@mui/material": "^9.4.0",
+    "@mui/x-charts": "^9.14.0",
+    "@mui/x-data-grid": "^9.14.0",
+    "@mui/x-date-pickers": "^9.14.0",
+    "@tanstack/ai": "^0.63.0",
+    "@tanstack/ai-openai": "^0.25.1",
+    "@tanstack/react-form": "^1.33.5",
+    "@tanstack/react-query": "^5.103.2",
+    "@tanstack/react-router": "^1.170.39",
+    "arktype": "^2.2.3",
+    "fflate": "^0.8.3",
+    "lexical": "^0.51.0",
+    "luxon": "^3.7.2",
+    "mermaid": "^12.0.0",
+    "openai": "^7.25.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "uuid": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.5",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vite-plugin-electron": "^1.1.2"
+  },
+  "build": {
+    "appId": "gov.va.grctool",
+    "productName": "GRC Evidence Workspace",
+    "files": [
+      "dist/**",
+      "dist-electron/**"
+    ],
+    "extraResources": [
+      {
+        "from": "catalog",
+        "to": "catalog"
+      }
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

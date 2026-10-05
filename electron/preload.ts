@@ -1,0 +1,35 @@
+import { contextBridge, ipcRenderer } from 'electron';
+import type { GrcBridge } from '../shared/types.js';
+
+const bridge: GrcBridge = {
+  getWorkspace: () => ipcRenderer.invoke('workspace:get'),
+  openWorkspaceFolder: () => ipcRenderer.invoke('workspace:open'),
+  loadCatalog: () => ipcRenderer.invoke('catalog:load'),
+  loadEvidence: () => ipcRenderer.invoke('evidence:load'),
+  saveEvidence: (records) => ipcRenderer.invoke('evidence:save', records),
+  deleteEvidence: (controlId) => ipcRenderer.invoke('evidence:delete', controlId),
+  loadSettings: () => ipcRenderer.invoke('settings:load'),
+  saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
+  addAttachments: (req) => ipcRenderer.invoke('attachments:add', req),
+  readAttachment: (relPath) => ipcRenderer.invoke('attachments:read', relPath),
+  revealAttachment: (relPath) => ipcRenderer.invoke('attachments:reveal', relPath),
+  renameAttachment: (req) => ipcRenderer.invoke('attachments:rename', req),
+  deleteAttachments: (relPaths) => ipcRenderer.invoke('attachments:delete', relPaths),
+  runScript: (req) => ipcRenderer.invoke('scripts:run', req),
+  aiEvaluate: (req) => ipcRenderer.invoke('ai:evaluate', req),
+  aiRevise: (req) => ipcRenderer.invoke('ai:revise', req),
+  aiRelatedDraft: (req) => ipcRenderer.invoke('ai:relatedDraft', req),
+  aiTestConnection: (settings) => ipcRenderer.invoke('ai:test', settings),
+  aiSignOut: () => ipcRenderer.invoke('ai:signOut'),
+  aiSignIn: (settings) => ipcRenderer.invoke('ai:signIn', settings),
+  aiSignedInAccount: (settings) => ipcRenderer.invoke('ai:signedInAccount', settings),
+  aiSetApiKey: (apiKey) => ipcRenderer.invoke('ai:setApiKey', apiKey),
+  aiClearApiKey: () => ipcRenderer.invoke('ai:clearApiKey'),
+  aiHasApiKey: () => ipcRenderer.invoke('ai:hasApiKey'),
+  exportFile: (req) => ipcRenderer.invoke('export:file', req),
+  exportOscalPackage: (req) => ipcRenderer.invoke('export:oscalPackage', req),
+  importBackup: () => ipcRenderer.invoke('import:backup'),
+  importOscalSsp: () => ipcRenderer.invoke('import:oscal'),
+};
+
+contextBridge.exposeInMainWorld('grc', bridge);
