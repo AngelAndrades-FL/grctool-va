@@ -22,13 +22,11 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import SearchIcon from '@mui/icons-material/Search';
 import SettingsIcon from '@mui/icons-material/Settings';
-import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import type { BaselineFilter, FrameworkMode } from '@shared/types';
 import { useAppState } from '@/state/AppState';
 import { useWorkspaceData } from '@/api/queries';
-import { api } from '@/api/client';
 import { isNodeInBaseline } from '@/domain/catalogIndex';
-import { computeCompleteness } from '@/domain/completeness';
+import { computeCompleteness, isDocumentedNa } from '@/domain/completeness';
 import { FamilyRail } from './FamilyRail';
 import { CommandPalette } from './CommandPalette';
 import { AtoBanner } from './AtoBanner';
@@ -42,7 +40,7 @@ const NAV = [
 
 export function AppShell() {
   const { index, evidence, isLoading, error } = useWorkspaceData();
-  const { baseline, setBaseline, mode, setMode, themeMode, toggleTheme, setPaletteOpen, toasts, dismissToast, notify } =
+  const { baseline, setBaseline, mode, setMode, themeMode, toggleTheme, setPaletteOpen, toasts, dismissToast } =
     useAppState();
 
   useEffect(() => {
@@ -58,7 +56,9 @@ export function AppShell() {
 
   const overall = useMemo(() => {
     if (!index) return { total: 0, complete: 0, percent: 0 };
-    const nodes = index.nodes.filter((node) => isNodeInBaseline(node, baseline, mode));
+    const nodes = index.nodes.filter(
+      (node) => isNodeInBaseline(node, baseline, mode) && !isDocumentedNa(evidence[node.id]),
+    );
     const complete = nodes.filter((node) => computeCompleteness(node, evidence[node.id]) >= 80).length;
     return {
       total: nodes.length,
@@ -136,17 +136,6 @@ export function AppShell() {
           <Tooltip title="Search controls (Ctrl+K)">
             <IconButton onClick={() => setPaletteOpen(true)} size="small">
               <SearchIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Open workspace folder">
-            <IconButton
-              size="small"
-              onClick={() => {
-                void api.openWorkspaceFolder();
-                notify('Opened the workspace folder', 'info');
-              }}
-            >
-              <FolderOpenIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title="Toggle theme">

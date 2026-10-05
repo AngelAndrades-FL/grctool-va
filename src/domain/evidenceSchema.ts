@@ -108,6 +108,7 @@ export const evidenceRecordSchema = type({
     evidenceRef: 'string',
   }).array(),
   artifacts: artifact.array(),
+  linkedArtifactIds: 'string[]',
   ownership: { responsibleRole: 'string', owner: 'string', poc: 'string' },
   dates: {
     implementedOn: 'string | null',

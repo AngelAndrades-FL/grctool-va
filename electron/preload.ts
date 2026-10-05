@@ -28,7 +28,12 @@ const bridge: GrcBridge = {
   aiHasApiKey: () => ipcRenderer.invoke('ai:hasApiKey'),
   exportFile: (req) => ipcRenderer.invoke('export:file', req),
   exportOscalPackage: (req) => ipcRenderer.invoke('export:oscalPackage', req),
-  importBackup: () => ipcRenderer.invoke('import:backup'),
+  backupConfig: () => ipcRenderer.invoke('config:backup'),
+  restoreConfig: () => ipcRenderer.invoke('config:restore'),
+  backupDatabase: () => ipcRenderer.invoke('db:backup'),
+  restoreDatabase: () => ipcRenderer.invoke('db:restore'),
+  chooseWorkspaceLocation: () => ipcRenderer.invoke('workspace:choose'),
+  resetWorkspaceLocation: () => ipcRenderer.invoke('workspace:reset'),
   importOscalSsp: () => ipcRenderer.invoke('import:oscal'),
 };
 

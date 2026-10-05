@@ -13,7 +13,11 @@ export default defineConfig({
   plugins: [
     react(),
     electron({
-      main: { entry: 'electron/main.ts' },
+      main: {
+        entry: 'electron/main.ts',
+        // The native addon locates its prebuilt .node via __dirname, so it cannot be bundled.
+        vite: { build: { rolldownOptions: { external: ['better-sqlite3'] } } },
+      },
       preload: {
         input: 'electron/preload.ts',
         // package.json sets "type": "module", so the CJS preload must not use .mjs.

@@ -60,6 +60,11 @@ export const api = {
   aiHasApiKey: (): Promise<boolean> => bridge().aiHasApiKey(),
   exportFile: (req: ExportRequest) => bridge().exportFile(req),
   exportOscalPackage: (req: OscalPackageRequest) => bridge().exportOscalPackage(req),
-  importBackup: () => bridge().importBackup(),
+  backupConfig: () => bridge().backupConfig(),
+  restoreConfig: () => bridge().restoreConfig(),
+  backupDatabase: () => bridge().backupDatabase(),
+  restoreDatabase: () => bridge().restoreDatabase(),
+  chooseWorkspaceLocation: () => bridge().chooseWorkspaceLocation(),
+  resetWorkspaceLocation: () => bridge().resetWorkspaceLocation(),
   importOscalSsp: () => bridge().importOscalSsp(),
 };

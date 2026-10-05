@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -95,8 +96,10 @@ export interface ArtifactDialogProps {
   controlId: string;
   familyId: string;
   evidenceRequired: EvidenceRequirement[];
+  /** Controls this artifact can also be shared with. */
+  controlOptions?: string[];
   onClose: () => void;
-  onSave: (artifact: Artifact) => void;
+  onSave: (artifact: Artifact, shareWith: string[]) => void;
 }
 
 export function ArtifactDialog({
@@ -105,10 +108,12 @@ export function ArtifactDialog({
   controlId,
   familyId,
   evidenceRequired,
+  controlOptions = [],
   onClose,
   onSave,
 }: ArtifactDialogProps) {
   const [draft, setDraft] = useState<Artifact | null>(artifact);
+  const [shareWith, setShareWith] = useState<string[]>([]);
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pickError, setPickError] = useState<string | null>(null);
@@ -117,6 +122,7 @@ export function ArtifactDialog({
 
   useEffect(() => {
     setDraft(artifact);
+    setShareWith([]);
     setPickError(null);
   }, [artifact]);
 
@@ -163,7 +169,7 @@ export function ArtifactDialog({
         setSaving(false);
       }
     }
-    onSave(next);
+    onSave(next, shareWith);
     onClose();
   };
 
@@ -322,6 +328,23 @@ export function ArtifactDialog({
           </Stack>
 
           <Divider />
+
+          {controlOptions.length > 0 && (
+            <Autocomplete
+              multiple
+              size="small"
+              options={controlOptions.filter((id) => id !== controlId)}
+              value={shareWith}
+              onChange={(_e, next) => setShareWith(next)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Also applies to"
+                  helperText="Other controls that use this same artifact as evidence. Edits here show in all of them."
+                />
+              )}
+            />
+          )}
 
           <RecurrenceSection artifact={draft} onChange={setDraft} currentUser={settings?.currentUser ?? ''} />
         </Stack>

@@ -198,10 +198,13 @@ export interface SupplementalRecord {
   narrativeText: {
     processDescription: string;
     limitations: string;
+    /** The implementation text itself; the SSP description holds the N/A rationale instead when not applicable. */
+    implementation?: string;
   };
   objectiveResponses: EvidenceRecord['objectiveResponses'];
   processSteps: EvidenceRecord['processSteps'];
   poam: EvidenceRecord['poam'];
+  poc?: string;
   /** Read-only: requirements saved before recurrence moved onto artifacts. Migrated on load, never written. */
   recurringEvidence?: LegacyRecurringRequirement[];
   aiEvaluations: EvidenceRecord['aiEvaluations'];
@@ -260,6 +263,7 @@ export function emptyRecord(controlId: string, origination: ControlDesignation =
     objectiveResponses: [],
     processSteps: [],
     artifacts: [],
+    linkedArtifactIds: [],
     ownership: { responsibleRole: '', owner: '', poc: '' },
     dates: { implementedOn: null, lastReviewedOn: null, nextReviewDue: null, evidenceAsOf: null },
     poam: { hasFinding: false, findingId: '', severity: '', remediationPlan: '', dueDate: null, artifactIds: [] },
@@ -363,6 +367,9 @@ export function recordsToOscal(
     (plan['control-implementation']['implemented-requirements'] ?? []).map((r) => [r['control-id'], r]),
   );
   const resources: OscalResource[] = [];
+  const ownedArtifacts = new Map(
+    records.flatMap((r) => r.artifacts.map((a) => [a.id, { owner: r.controlId, artifact: a }] as const)),
+  );
   const supplemental: SupplementalFile = {
     schema: 'grctool/supplemental',
     version: 1,
@@ -374,6 +381,14 @@ export function recordsToOscal(
     const oscalId = toOscalId(rec.controlId);
     const prior = priorReqs.get(oscalId);
     const links: OscalLink[] = [];
+
+    // Linked artifacts live once in back-matter under their owner; this control only references them.
+    for (const id of rec.linkedArtifactIds ?? []) {
+      const owned = ownedArtifacts.get(id);
+      if (owned && owned.owner !== rec.controlId) {
+        links.push({ href: `#${id}`, rel: 'evidence', text: owned.artifact.title || owned.artifact.evidenceType });
+      }
+    }
 
     for (const art of rec.artifacts) {
       const resourceUuid = art.id;
@@ -441,10 +456,12 @@ export function recordsToOscal(
       narrativeText: {
         processDescription: rec.narrative.processDescription.text,
         limitations: rec.narrative.limitations.text,
+        implementation: rec.narrative.implementation.text,
       },
       objectiveResponses: rec.objectiveResponses,
       processSteps: rec.processSteps,
       poam: rec.poam,
+      poc: rec.ownership.poc,
       aiEvaluations: rec.aiEvaluations,
       changeLog: rec.changeLog,
       dates: rec.dates,
@@ -488,7 +505,10 @@ export function recordsToOscal(
         {
           'component-uuid': THIS_SYSTEM_COMPONENT_UUID,
           uuid: prior?.['by-components']?.[0]?.uuid ?? uuid(),
-          description: rec.narrative.implementation.text,
+          description:
+            rec.implementationStatus === 'not_applicable' && rec.naJustification.trim()
+              ? rec.naJustification
+              : rec.narrative.implementation.text,
           'implementation-status': {
             state: STATUS_TO_OSCAL[rec.implementationStatus],
             remarks: rec.implementationStatus === 'not_applicable' ? rec.naJustification : undefined,
@@ -529,10 +549,19 @@ export function readAtoDates(ssp: OscalSsp | null): { lastAtoDate: string | null
     const byComp = req['by-components']?.[0];
     const base = emptyRecord(controlId);
 
-    const artifacts: Artifact[] = (byComp?.links ?? [])
+    const resourcesHere = (byComp?.links ?? [])
       .filter((l) => l.href.startsWith('#'))
       .map((l) => resources.get(l.href.slice(1)))
-      .filter((r): r is OscalResource => Boolean(r) && !prop(r?.props, 'recurrence-cycle-of'))
+      .filter((r): r is OscalResource => Boolean(r) && !prop(r?.props, 'recurrence-cycle-of'));
+    // A resource tagged with another control's id is shared into this one rather than owned by it.
+    const isLinked = (r: OscalResource) => {
+      const owner = prop(r.props, 'control-id');
+      return owner !== undefined && owner !== controlId;
+    };
+    const linkedArtifactIds = resourcesHere.filter(isLinked).map((r) => r.uuid);
+
+    const artifacts: Artifact[] = resourcesHere
+      .filter((r) => !isLinked(r))
       .map((r) => {
         const extras = sup?.artifactExtras[r.uuid];
         const rlink = r.rlinks?.[0];
@@ -569,7 +598,10 @@ export function readAtoDates(ssp: OscalSsp | null): { lastAtoDate: string | null
       naJustification: sup?.naJustification ?? '',
       tags: (prop(req.props, 'tags') ?? '').split(',').filter(Boolean),
       narrative: {
-        implementation: { json: sup?.narrativeJson.implementation ?? null, text: byComp?.description ?? '' },
+        implementation: {
+          json: sup?.narrativeJson.implementation ?? null,
+          text: sup?.narrativeText.implementation ?? byComp?.description ?? '',
+        },
         processDescription: {
           json: sup?.narrativeJson.processDescription ?? null,
           text: sup?.narrativeText.processDescription ?? '',
@@ -586,10 +618,11 @@ export function readAtoDates(ssp: OscalSsp | null): { lastAtoDate: string | null
       objectiveResponses: sup?.objectiveResponses ?? [],
       processSteps: sup?.processSteps ?? [],
       artifacts: mergeLegacyRecurring(artifacts, sup?.recurringEvidence),
+      linkedArtifactIds,
       ownership: {
         responsibleRole: byComp?.['responsible-roles']?.[0]?.['role-id'] ?? '',
         owner: byComp?.['responsible-roles']?.[0]?.remarks ?? '',
-        poc: '',
+        poc: sup?.poc ?? '',
       },
       dates: sup?.dates ?? {
         implementedOn: prop(req.props, 'implemented-on') ?? null,

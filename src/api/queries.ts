@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import type { AiEvaluateRequest, AppSettings, EvidenceMap, EvidenceRecord, ExportRequest } from '@shared/types';
-import { mergeLegacyRecurring, type LegacyRecurringRequirement } from '@shared/recurring';
 import { api } from './client';
 import { buildIndex, type CatalogIndex } from '@/domain/catalogIndex';
+import { resolveSharedArtifacts } from '@/domain/sharedArtifacts';
 
 export const queryKeys = {
   workspace: ['workspace'] as const,
@@ -103,24 +103,14 @@ export function useRunScript() {
   return useMutation({ mutationFn: api.runScript });
 }
 
-export function useImportBackup() {
+/** Run a backup/restore action, then refetch everything it may have changed. */
+export function useDataAction(action: () => Promise<{ cancelled: boolean }>) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      const result = await api.importBackup();
-      if (!result.cancelled && result.evidence) {
-        // Backups taken before recurrence moved onto artifacts carry a separate requirement list.
-        const records = Object.values(result.evidence).map((record) => {
-          const { recurringEvidence, ...rest } = record as EvidenceRecord & {
-            recurringEvidence?: LegacyRecurringRequirement[];
-          };
-          return { ...rest, artifacts: mergeLegacyRecurring(rest.artifacts ?? [], recurringEvidence) };
-        });
-        await api.saveEvidence(records);
-      }
-      return result;
+    mutationFn: action,
+    onSuccess: (result) => {
+      if (!result.cancelled) void client.invalidateQueries();
     },
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.evidence }),
   });
 }
 
@@ -133,7 +123,10 @@ export function useWorkspaceData() {
   return useMemo(
     () => ({
       index: catalog.data,
-      evidence: evidence.data ?? {},
+      /** Includes artifacts linked from other controls; for display and metrics only. */
+      evidence: resolveSharedArtifacts(evidence.data ?? {}),
+      /** What is stored; use for editing, saving and exporting the SSP. */
+      rawEvidence: evidence.data ?? {},
       settings: settings.data,
       isLoading: catalog.isLoading || evidence.isLoading || settings.isLoading,
       error: catalog.error ?? evidence.error ?? settings.error,

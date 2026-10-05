@@ -3,7 +3,7 @@ import { Box, Button, MenuItem, Paper, Stack, TextField, Typography } from '@mui
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import SaveIcon from '@mui/icons-material/Save';
 import { DateTime, Info } from 'luxon';
-import type { AppSettings } from '@shared/types';
+import { RESPONSIBLE_ROLES, type AppSettings } from '@shared/types';
 import { useSaveSettings, useSettings } from '@/api/queries';
 import { useAppState } from '@/state/AppState';
 import { atoMinDate } from '@/domain/completeness';
@@ -161,7 +161,48 @@ export function Settings() {
       </Stack>
 
         <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
-          <AiSettingsSection value={draft.ai} onChange={(ai) => patch({ ai })} />
+          <Stack spacing={3}>
+            <AiSettingsSection value={draft.ai} onChange={(ai) => patch({ ai })} />
+            <Paper variant="outlined" sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Responsible role contacts
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                Default name and email for each role. Choosing a role on a control fills in these values.
+              </Typography>
+              <Stack spacing={2}>
+                {RESPONSIBLE_ROLES.map((role) => {
+                  const contact = draft.roleContacts?.[role.id] ?? { name: '', email: '' };
+                  const update = (change: Partial<typeof contact>) =>
+                    patch({ roleContacts: { ...draft.roleContacts, [role.id]: { ...contact, ...change } } });
+                  return (
+                    <Box key={role.id}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        {role.label}
+                      </Typography>
+                      <Stack direction="row" spacing={2}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label="Name"
+                          value={contact.name}
+                          onChange={(e) => update({ name: e.target.value })}
+                        />
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label="Email"
+                          type="email"
+                          value={contact.email}
+                          onChange={(e) => update({ email: e.target.value })}
+                        />
+                      </Stack>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Paper>
+          </Stack>
         </Box>
       </Stack>
 

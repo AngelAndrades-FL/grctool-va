@@ -1,14 +1,20 @@
 import { useMemo, useState } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   Menu,
   MenuItem,
   Paper,
   Stack,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -18,6 +24,8 @@ import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import LinkIcon from '@mui/icons-material/Link';
+import AddLinkIcon from '@mui/icons-material/AddLink';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import NotesIcon from '@mui/icons-material/Notes';
 import TerminalIcon from '@mui/icons-material/Terminal';
@@ -66,6 +74,17 @@ export interface ArtifactsPanelProps {
   familyId: string;
   evidenceRequired: EvidenceRequirement[];
   artifacts: Artifact[];
+  /** Artifacts owned by other controls and linked here (read-only), each with `sharedFrom` set. */
+  linkedArtifacts?: Artifact[];
+  /** Artifacts in other controls that could be linked here. */
+  linkCandidates?: Array<{ owner: string; artifact: Artifact }>;
+  /** Every control id, for the "Also applies to" picker. */
+  controlOptions?: string[];
+  /** Controls (other than this one) that link the given artifact. */
+  linkedBy?: (artifactId: string) => string[];
+  onLink?: (artifactIds: string[]) => void;
+  onUnlink?: (artifactId: string) => void;
+  onShare?: (artifactId: string, controlIds: string[]) => void;
   currentUser: string;
   /** The control's text reads like evidence must be re-collected on a cadence. */
   suggestRecurring?: boolean;
@@ -77,6 +96,13 @@ export function ArtifactsPanel({
   familyId,
   evidenceRequired,
   artifacts,
+  linkedArtifacts = [],
+  linkCandidates = [],
+  controlOptions = [],
+  linkedBy,
+  onLink,
+  onUnlink,
+  onShare,
   currentUser,
   suggestRecurring = false,
   onChange,
@@ -88,21 +114,24 @@ export function ArtifactsPanel({
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [editing, setEditing] = useState<Artifact | null>(null);
   const [scripting, setScripting] = useState<{ artifact: Artifact | null } | null>(null);
+  const [linking, setLinking] = useState<string[] | null>(null);
+  const rows = useMemo(() => [...artifacts, ...linkedArtifacts], [artifacts, linkedArtifacts]);
 
   const satisfiedIndexes = useMemo(() => {
-    const types = new Set(artifacts.map((a) => a.evidenceType.toLowerCase()));
+    const types = new Set(rows.map((a) => a.evidenceType.toLowerCase()));
     const set = new Set<number>();
     evidenceRequired.forEach((req, index) => {
       if (types.has(req.evidence_type.toLowerCase())) set.add(index);
     });
     return set;
-  }, [artifacts, evidenceRequired]);
+  }, [rows, evidenceRequired]);
 
   const missing = evidenceRequired.filter((_req, index) => !satisfiedIndexes.has(index));
 
-  const upsert = (artifact: Artifact) => {
+  const upsert = (artifact: Artifact, shareWith: string[] = []) => {
     const index = artifacts.findIndex((a) => a.id === artifact.id);
     onChange(index === -1 ? [...artifacts, artifact] : artifacts.map((a) => (a.id === artifact.id ? artifact : a)));
+    if (shareWith.length) onShare?.(artifact.id, shareWith);
   };
 
   const firstMissingType = () => (missing[0] ?? evidenceRequired[0])?.evidence_type ?? 'Other';
@@ -130,7 +159,9 @@ export function ArtifactsPanel({
     const files = filesOf(artifact).filter((p) => !stillUsed.has(p));
     const what = earlier > 0 ? `"${artifact.title}" and its ${earlier} earlier cycle(s)` : `"${artifact.title}"`;
     const fileNote = files.length ? ` ${files.length} file(s) will be permanently deleted from the workspace.` : '';
-    if ((earlier > 0 || files.length > 0) && !window.confirm(`Remove ${what}?${fileNote}`)) {
+    const sharedWith = linkedBy?.(artifact.id) ?? [];
+    const sharedNote = sharedWith.length ? ` It is also used by ${sharedWith.join(', ')}, which will lose it.` : '';
+    if ((earlier > 0 || files.length > 0 || sharedWith.length > 0) && !window.confirm(`Remove ${what}?${fileNote}${sharedNote}`)) {
       return;
     }
     onChange(artifacts.filter((a) => a.id !== artifact.id));
@@ -159,7 +190,16 @@ export function ArtifactsPanel({
         </Tooltip>
       ),
     },
-    { field: 'title', headerName: 'Title', flex: 1, minWidth: 180 },
+    { field: 'title', headerName: 'Title', flex: 1, minWidth: 180,
+      renderCell: (params) => (
+        <Stack direction="row" spacing={0.75} sx={{ height: '100%', alignItems: 'center', minWidth: 0 }}>
+          <Typography variant="body2" noWrap>{params.row.title}</Typography>
+          {params.row.sharedFrom && (
+            <Chip size="small" variant="outlined" icon={<LinkIcon />} label={`Shared from ${params.row.sharedFrom}`} sx={{ height: 20, fontSize: 11 }} />
+          )}
+        </Stack>
+      ),
+    },
     { field: 'evidenceType', headerName: 'Evidence type', width: 170 },
     {
       field: 'recurrence',
@@ -209,7 +249,16 @@ export function ArtifactsPanel({
       headerName: '',
       width: 90,
       sortable: false,
-      renderCell: (params) => (
+      renderCell: (params) =>
+        params.row.sharedFrom ? (
+          <Stack direction="row" sx={{ height: '100%', alignItems: 'center' }}>
+            <Tooltip title={`Unlink (edit it in ${params.row.sharedFrom})`}>
+              <IconButton size="small" onClick={() => onUnlink?.(params.row.id)}>
+                <LinkOffIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        ) : (
         <Stack direction="row" sx={{ height: '100%', alignItems: 'center' }}>
           <IconButton
             size="small"
@@ -226,7 +275,7 @@ export function ArtifactsPanel({
             <DeleteOutlinedIcon fontSize="small" />
           </IconButton>
         </Stack>
-      ),
+        ),
     },
   ];
 
@@ -241,6 +290,17 @@ export function ArtifactsPanel({
         >
           Add artifact
         </Button>
+        {onLink && (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddLinkIcon />}
+            disabled={linkCandidates.length === 0}
+            onClick={() => setLinking([])}
+          >
+            Link existing artifact
+          </Button>
+        )}
         <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
           <MenuItem
             onClick={() => {
@@ -318,13 +378,13 @@ export function ArtifactsPanel({
         </Alert>
       )}
 
-      {artifacts.length > 0 && (
+      {rows.length > 0 && (
         <Paper variant="outlined">
           <DataGrid<Artifact>
-            rows={artifacts}
+            rows={rows}
             columns={columns}
             density="compact"
-            hideFooter={artifacts.length <= 10}
+            hideFooter={rows.length <= 10}
             disableRowSelectionOnClick
             autoHeight
             sx={{ border: 0 }}
@@ -338,9 +398,47 @@ export function ArtifactsPanel({
         controlId={controlId}
         familyId={familyId}
         evidenceRequired={evidenceRequired}
+        controlOptions={controlOptions}
         onClose={() => setEditing(null)}
         onSave={upsert}
       />
+
+      <Dialog open={linking !== null} onClose={() => setLinking(null)} fullWidth maxWidth="sm">
+        <DialogTitle>Link existing artifact</DialogTitle>
+        <DialogContent dividers>
+          <Autocomplete
+            multiple
+            options={linkCandidates.map((c) => c.artifact.id)}
+            value={linking ?? []}
+            onChange={(_e, next) => setLinking(next)}
+            groupBy={(id) => linkCandidates.find((c) => c.artifact.id === id)?.owner ?? ''}
+            getOptionLabel={(id) => {
+              const c = linkCandidates.find((x) => x.artifact.id === id);
+              return c ? `${c.artifact.title || c.artifact.fileName || 'Untitled'} (${c.artifact.evidenceType})` : id;
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Artifacts from other controls"
+                helperText="A linked artifact counts toward this control's evidence types when its type matches."
+              />
+            )}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLinking(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={!linking?.length}
+            onClick={() => {
+              if (linking?.length) onLink?.(linking);
+              setLinking(null);
+            }}
+          >
+            Link
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <ScriptArtifactDialog
         open={Boolean(scripting)}

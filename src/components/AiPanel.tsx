@@ -68,7 +68,7 @@ export function AiPanel({ evaluation, isEvaluating = false, onEvaluate, onEditPr
 
   const score = useMemo(() => {
     if (!evaluation) return 0;
-    return Math.round(evaluation.score * 100);
+    return Math.round(evaluation.score);
   }, [evaluation]);
 
   // No evaluation yet

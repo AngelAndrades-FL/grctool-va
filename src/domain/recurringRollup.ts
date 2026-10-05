@@ -55,6 +55,7 @@ export function allRecurringRows(evidence: EvidenceMap, settings: AppSettings | 
   const rows: RecurringRow[] = [];
 
   for (const record of Object.values(evidence)) {
+    if (record.implementationStatus === 'not_applicable') continue;
     for (const artifact of record.artifacts) {
       if (!artifact.recurrence) continue;
       const currentLabel = artifactCycleLabel(artifact, cycleSettings);

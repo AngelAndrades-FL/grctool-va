@@ -62,7 +62,7 @@ function EnhancementStrip({ controlId }: { controlId: string }) {
 
 export function ControlDetail() {
   const { controlId } = useParams({ from: '/control/$controlId' });
-  const { index, evidence } = useWorkspaceData();
+  const { index, rawEvidence } = useWorkspaceData();
   const { baseline, mode } = useAppState();
 
   const node = index?.nodeById.get(controlId);
@@ -105,7 +105,7 @@ export function ControlDetail() {
         </Paper>
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
           {/* Remount on control change so the form re-seeds from the new record. */}
-          <EvidenceForm key={node.id} node={node} record={evidence[node.id]} />
+          <EvidenceForm key={node.id} node={node} record={rawEvidence[node.id]} />
         </Box>
       </Box>
     </Box>

@@ -90,8 +90,19 @@ export function computeCompleteness(node: ControlNode, record?: EvidenceRecord):
   return Math.round(Math.max(0, Math.min(100, score)));
 }
 
+/** Marked not applicable, with or without a rationale. */
+export function isNotApplicable(record?: EvidenceRecord): boolean {
+  return record?.implementationStatus === 'not_applicable';
+}
+
+/** Not applicable with a rationale on file: documented, so it drops out of coverage, gap and staleness metrics. */
+export function isDocumentedNa(record?: EvidenceRecord): boolean {
+  return isNotApplicable(record) && record!.naJustification.trim().length > 0;
+}
+
 /** Evidence is stale once it predates the last ATO or exceeds the configured age. */
 export function stalenessDays(record: EvidenceRecord | undefined, staleAfterDays: number): number | null {
+  if (isNotApplicable(record)) return null;
   const stamp = record?.dates.evidenceAsOf ?? record?.dates.lastReviewedOn;
   if (!stamp) return null;
   const age = Math.floor(-DateTime.fromISO(stamp).diffNow('days').days);
@@ -99,7 +110,7 @@ export function stalenessDays(record: EvidenceRecord | undefined, staleAfterDays
 }
 
 export function predatesAto(record: EvidenceRecord | undefined, lastAtoDate: string | null): boolean {
-  if (!record || !lastAtoDate) return false;
+  if (!record || !lastAtoDate || isNotApplicable(record)) return false;
   const stamp = record.dates.evidenceAsOf ?? record.dates.lastReviewedOn;
   if (!stamp) return false;
   return DateTime.fromISO(stamp) < DateTime.fromISO(lastAtoDate);
@@ -115,6 +126,23 @@ export function buildGapReport(
   record: EvidenceRecord | undefined,
   options: { staleAfterDays: number; lastAtoDate: string | null },
 ): GapReport {
+  if (isNotApplicable(record)) {
+    // Nothing else is expected of a not-applicable control except the rationale.
+    return {
+      controlId: node.id,
+      familyId: node.familyId,
+      name: node.name,
+      completeness: computeCompleteness(node, record),
+      missingNarrative: false,
+      unmappedEvidenceTypes: [],
+      unansweredObjectives: 0,
+      unansweredOdp: [],
+      noArtifacts: false,
+      stale: false,
+      staleByDays: null,
+      reasons: isDocumentedNa(record) ? [] : ['Rationale for not applicable is missing.'],
+    };
+  }
   const coverage = evidenceTypeCoverage(node, record);
   const odp = requiredOdp(node);
   const answeredOdpIds = new Set(

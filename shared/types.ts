@@ -164,6 +164,8 @@ export interface Artifact {
   collectedAt?: string;
   collectedBy?: string;
   recurrence?: ArtifactRecurrence;
+  /** View-only: set on artifacts shown in a control that does not own them; never persisted. */
+  sharedFrom?: string;
 }
 
 /** Lexical editor state serialised as JSON, plus a derived plain-text projection. */
@@ -330,6 +332,8 @@ export interface EvidenceRecord {
   objectiveResponses: ObjectiveResponse[];
   processSteps: ProcessStep[];
   artifacts: Artifact[];
+  /** Ids of artifacts owned by other controls that also serve as evidence here. */
+  linkedArtifactIds: string[];
   ownership: Ownership;
   dates: EvidenceDates;
   poam: PoamEntry;
@@ -371,6 +375,8 @@ export interface AppSettings {
   promptVersion: number;
   promptHistory: PromptVersion[];
   themeMode: 'light' | 'dark';
+  /** Default name and email per `RESPONSIBLE_ROLES` id, applied when a role is chosen on a control. */
+  roleContacts: Record<string, { name: string; email: string }>;
   ai: AiSettings;
 }
 
@@ -422,10 +428,16 @@ export interface AiConnectionTestResult {
 
 export interface WorkspaceInfo {
   root: string;
-  catalogPath: string;
-  sspPath: string;
-  supplementalPath: string;
+  defaultRoot: string;
+  dbPath: string;
+  settingsPath: string;
   attachmentsDir: string;
+}
+
+/** Result of a backup/restore action that asks for a file. */
+export interface FileActionResult {
+  cancelled: boolean;
+  path?: string;
 }
 
 export interface AiEvaluateRequest {
@@ -612,8 +624,14 @@ export interface GrcBridge {
   aiRelatedDraft(req: AiRelatedDraftRequest): Promise<AiRelatedDraft>;
   exportFile(req: ExportRequest): Promise<{ cancelled: boolean; path?: string }>;
   exportOscalPackage(req: OscalPackageRequest): Promise<OscalPackageResult>;
-  importBackup(): Promise<{ cancelled: boolean; evidence?: EvidenceMap }>;
   importOscalSsp(): Promise<OscalImportResult>;
+  backupConfig(): Promise<FileActionResult>;
+  restoreConfig(): Promise<FileActionResult>;
+  backupDatabase(): Promise<FileActionResult>;
+  restoreDatabase(): Promise<FileActionResult>;
+  /** Pick a new workspace folder (null result = cancelled). Existing data is not moved. */
+  chooseWorkspaceLocation(): Promise<WorkspaceInfo | null>;
+  resetWorkspaceLocation(): Promise<WorkspaceInfo>;
   /** Tests the given (possibly unsaved) settings, signing in first if needed. */
   aiTestConnection(settings: AiSettings): Promise<AiConnectionTestResult>;
   /** Forgets cached Entra sign-ins so the next request signs in again. */

@@ -16,7 +16,7 @@ import { useWorkspaceData } from '@/api/queries';
 import { FilterSwitch } from '@/components/FilterSwitch';
 import { isNodeInBaseline, type ControlNode } from '@/domain/catalogIndex';
 import { baselineLabel, overlayDivergence } from '@/domain/baseline';
-import { buildGapReport, computeCompleteness } from '@/domain/completeness';
+import { buildGapReport, computeCompleteness, isNotApplicable } from '@/domain/completeness';
 import { rollupRecurring } from '@/domain/recurringRollup';
 import { STATUS_LABEL as RECURRING_STATUS_LABEL, statusSeverity } from '@shared/recurring';
 import { scoreColour, statusColour } from '@/theme';
@@ -43,6 +43,7 @@ interface Row {
   designation: string;
   status: ImplementationStatus;
   completeness: number;
+  notApplicable: boolean;
   artifacts: number;
   lastReviewed: string | null;
   nextReview: string | null;
@@ -76,7 +77,7 @@ export function FamilyView() {
           lastAtoDate: settings?.lastAtoDate ?? null,
         });
         const latestAi = record?.aiEvaluations.at(-1);
-        const recurring = rollupRecurring(record?.artifacts ?? [], settings?.recurringDueSoonDays ?? 30);
+        const recurring = rollupRecurring(isNotApplicable(record) ? [] : (record?.artifacts ?? []), settings?.recurringDueSoonDays ?? 30);
         return {
           id: node.id,
           name: node.name,
@@ -88,10 +89,11 @@ export function FamilyView() {
           designation: node.designation.replace(/_/g, ' '),
           status: record?.implementationStatus ?? 'not_started',
           completeness: computeCompleteness(node, record),
+          notApplicable: isNotApplicable(record),
           artifacts: record?.artifacts.length ?? 0,
           lastReviewed: record?.dates.lastReviewedOn ?? null,
           nextReview: record?.dates.nextReviewDue ?? null,
-          aiScore: latestAi?.score ?? null,
+          aiScore: isNotApplicable(record) ? null : (latestAi?.score ?? null),
           gapCount: gaps.reasons.length,
           inBaseline: isNodeInBaseline(node, baseline, mode),
           recurringCount: recurring.count,
@@ -161,7 +163,14 @@ export function FamilyView() {
         field: 'completeness',
         headerName: 'Complete',
         width: 120,
-        renderCell: (params) => (
+        renderCell: (params) =>
+          params.row.notApplicable ? (
+            <Stack sx={{ height: '100%', justifyContent: 'center' }}>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                N/A
+              </Typography>
+            </Stack>
+          ) : (
           <Stack sx={{ width: '100%', height: '100%', justifyContent: 'center' }} spacing={0.25}>
             <Typography variant="caption">{params.row.completeness}%</Typography>
             <LinearProgress
@@ -174,7 +183,7 @@ export function FamilyView() {
               }}
             />
           </Stack>
-        ),
+          ),
       },
       { field: 'artifacts', headerName: 'Artifacts', width: 85, type: 'number' },
       {

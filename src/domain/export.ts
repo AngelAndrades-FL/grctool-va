@@ -2,7 +2,7 @@
 import type { AppSettings, EvidenceMap } from '@shared/types';
 import { FREQUENCY_LABEL, STATUS_LABEL } from '@shared/recurring';
 import type { CatalogIndex } from './catalogIndex';
-import { computeCompleteness } from './completeness';
+import { computeCompleteness, isNotApplicable } from './completeness';
 import { allRecurringRows } from './recurringRollup';
 
 function csvCell(value: string): string {
@@ -28,19 +28,22 @@ export function buildCsv(index: CatalogIndex, evidence: EvidenceMap): string {
     'Last reviewed',
     'Next review due',
     'Evidence as of',
+    'Not-applicable rationale',
   ];
   const rows = index.nodes.map((node) => {
     const record = evidence[node.id];
+    const na = isNotApplicable(record);
     return [
       node.id,
       node.familyId,
       node.name,
       record?.implementationStatus ?? 'not_started',
-      String(computeCompleteness(node, record)),
+      na ? '' : String(computeCompleteness(node, record)),
       String(record?.artifacts.length ?? 0),
       record?.dates.lastReviewedOn ?? '',
       record?.dates.nextReviewDue ?? '',
       record?.dates.evidenceAsOf ?? '',
+      na ? record!.naJustification : '',
     ]
       .map(csvCell)
       .join(',');
@@ -98,6 +101,11 @@ export function buildRecurringCsv(evidence: EvidenceMap, settings: AppSettings |
     lines.push('', `## ${family.family_id} \u2014 ${family.family_name}`);
     for (const node of nodes) {
       const record = evidence[node.id]!;
+      if (isNotApplicable(record)) {
+        lines.push('', `### ${node.id} \u2014 ${node.name}`, 'Status: **not applicable**');
+        lines.push('', record.naJustification.trim() || '_Rationale not yet documented._');
+        continue;
+      }
       lines.push(
         '',
         `### ${node.id} \u2014 ${node.name}`,

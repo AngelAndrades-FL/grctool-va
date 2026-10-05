@@ -13,7 +13,7 @@ import {
 import { useAppState } from '@/state/AppState';
 import { useWorkspaceData } from '@/api/queries';
 import { isNodeInBaseline } from '@/domain/catalogIndex';
-import { computeCompleteness } from '@/domain/completeness';
+import { computeCompleteness, isDocumentedNa } from '@/domain/completeness';
 import { LinkListItemButton } from './routerLinks';
 
 interface FamilyStat {
@@ -32,8 +32,8 @@ export function FamilyRail() {
   const stats = useMemo<FamilyStat[]>(() => {
     if (!index) return [];
     return index.families.map((family) => {
-      const nodes = (index.controlsByFamily.get(family.family_id) ?? []).filter((node) =>
-        isNodeInBaseline(node, baseline, mode),
+      const nodes = (index.controlsByFamily.get(family.family_id) ?? []).filter(
+        (node) => isNodeInBaseline(node, baseline, mode) && !isDocumentedNa(evidence[node.id]),
       );
       const complete = nodes.filter((node) => computeCompleteness(node, evidence[node.id]) >= 80).length;
       return {

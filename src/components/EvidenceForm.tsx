@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useForm } from '@tanstack/react-form';
+import { useForm, useStore } from '@tanstack/react-form';
 import {
   Box,
   Button,
@@ -37,7 +37,8 @@ import type { ControlNode } from '@/domain/catalogIndex';
 import { seedRecord } from '@/domain/records';
 import { validateEvidenceRules } from '@/domain/evidenceSchema';
 import { computeCompleteness, atoMinDate } from '@/domain/completeness';
-import { useSaveEvidence, useSettings, useAiEvaluate } from '@/api/queries';
+import { useSaveEvidence, useSettings, useAiEvaluate, useEvidence, useCatalogIndex } from '@/api/queries';
+import { artifactOwners } from '@/domain/sharedArtifacts';
 import { useAppState } from '@/state/AppState';
 import { scoreColour, statusColour } from '@/theme';
 import { RichTextEditor } from './RichTextEditor';
@@ -90,6 +91,10 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
   const saveEvidence = useSaveEvidence();
   const aiEvaluate = useAiEvaluate();
   const { data: settings } = useSettings();
+  const { data: allEvidence } = useEvidence();
+  const { data: catalogIndex } = useCatalogIndex();
+  const owners = useMemo(() => artifactOwners(allEvidence ?? {}), [allEvidence]);
+  const controlOptions = useMemo(() => [...(catalogIndex?.nodeById.keys() ?? [])].sort(), [catalogIndex]);
   const { notify } = useAppState();
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const initial = useMemo(() => seedRecord(node, record), [node, record]);
@@ -121,6 +126,29 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
     onSubmit: ({ value }) => persist(value),
   });
 
+  const shareArtifact = useCallback(
+    (artifactId: string, controlIds: string[]) => {
+      const records = controlIds.flatMap((id) => {
+        const target = catalogIndex?.nodeById.get(id);
+        if (!target || id === node.id) return [];
+        const current = seedRecord(target, allEvidence?.[id]);
+        return [
+          {
+            ...current,
+            linkedArtifactIds: [...new Set([...current.linkedArtifactIds, artifactId])],
+            updatedAt: new Date().toISOString(),
+          },
+        ];
+      });
+      if (records.length) {
+        saveEvidence.mutate(records, {
+          onError: (error) => notify(error instanceof Error ? error.message : 'Sharing failed', 'error'),
+        });
+      }
+    },
+    [allEvidence, catalogIndex, node.id, saveEvidence, notify],
+  );
+
   const buildAiRequest = useCallback((): AiEvaluateRequest => {
     const narrative = form.state.values.narrative.implementation.text;
     return {
@@ -135,11 +163,17 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
         return { met: answer?.met ?? null, note: answer?.note ?? '' };
       }),
       requiredEvidenceTypes: node.evidenceRequired?.map((e) => e.evidence_type) ?? [],
-      providedEvidenceTypes: form.state.values.artifacts.map((a) => a.evidenceType),
+      providedEvidenceTypes: [
+        ...form.state.values.artifacts.map((a) => a.evidenceType),
+        ...form.state.values.linkedArtifactIds.flatMap((id) => {
+          const entry = owners.get(id);
+          return entry && entry.owner !== node.id ? [entry.artifact.evidenceType] : [];
+        }),
+      ],
       vaOdpValues: form.state.values.odpResponses.map((o) => ({ parameter: o.label, value: o.value })),
       vaSpecificRequirements: node.vaOverlay?.va_specific_requirements ?? [],
     };
-  }, [form.state.values, node]);
+  }, [form.state.values, node, owners]);
 
   const runEvaluate = useCallback(
     (promptOverride?: string) => {
@@ -197,6 +231,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
   }, [promptDraft, runEvaluate]);
 
   const ruleErrors = validateEvidenceRules(form.state.values) ?? {};
+  const isNa = useStore(form.store, (state) => state.values.implementationStatus === 'not_applicable');
   const completeness = computeCompleteness(node, form.state.values);
   const minEvidenceDate = atoMinDate(settings?.lastAtoDate);
   const recurringSuggested = useMemo(
@@ -257,30 +292,22 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
               )}
             </form.Field>
 
-            <form.Field name="inScope">
-              {(field) => (
-                <FormControlLabel
-                  control={
-                    <Switch checked={field.state.value} onChange={(e) => field.handleChange(e.target.checked)} />
-                  }
-                  label={<Typography variant="body2">In scope for this system</Typography>}
-                />
-              )}
-            </form.Field>
-
             <form.Subscribe selector={(state) => state.values.implementationStatus}>
               {(status) =>
-                status === 'not_applicable' || !form.state.values.inScope ? (
+                status === 'not_applicable' ? (
                   <form.Field name="naJustification">
                     {(field) => (
                       <TextField
                         fullWidth
                         multiline
-                        minRows={2}
-                        label="Not-applicable justification"
+                        minRows={3}
+                        label="Rationale for not applicable"
                         required
                         error={Boolean(ruleErrors.naJustification)}
-                        helperText={ruleErrors.naJustification ?? 'Assessors will read this in place of an implementation statement.'}
+                        helperText={
+                          ruleErrors.naJustification ??
+                          'Written to the SSP as this control\u2019s implementation statement. Explain why the control does not apply to this system and who decided.'
+                        }
                         value={field.state.value}
                         onChange={(e) => field.handleChange(e.target.value)}
                       />
@@ -291,6 +318,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
             </form.Subscribe>
           </SectionCard>
 
+          {!isNa && (
           <SectionCard
             title="Implementation narrative"
             subtitle="Describe the control as it actually operates — who performs it, using what, how often, and how it is evidenced."
@@ -359,6 +387,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
               )}
             </form.Field>
           </SectionCard>
+          )}
 
           <SectionCard
             title="Evidence artifacts"
@@ -366,11 +395,31 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
           >
             <form.Field name="artifacts">
               {(field) => (
+                <form.Subscribe selector={(state) => state.values.linkedArtifactIds}>
+                  {(linkedIds) => (
                 <ArtifactsPanel
                   controlId={node.id}
                   familyId={node.familyId}
                   evidenceRequired={node.evidenceRequired}
                   artifacts={field.state.value}
+                  linkedArtifacts={linkedIds.flatMap((id) => {
+                    const entry = owners.get(id);
+                    return entry && entry.owner !== node.id ? [{ ...entry.artifact, sharedFrom: entry.owner }] : [];
+                  })}
+                  linkCandidates={[...owners.entries()]
+                    .filter(([id, entry]) => entry.owner !== node.id && !linkedIds.includes(id))
+                    .map(([, entry]) => entry)}
+                  controlOptions={controlOptions}
+                  linkedBy={(artifactId) =>
+                    Object.values(allEvidence ?? {})
+                      .filter((r) => r.controlId !== node.id && r.linkedArtifactIds?.includes(artifactId))
+                      .map((r) => r.controlId)
+                  }
+                  onLink={(ids) => form.setFieldValue('linkedArtifactIds', [...new Set([...linkedIds, ...ids])])}
+                  onUnlink={(id) =>
+                    form.setFieldValue('linkedArtifactIds', linkedIds.filter((x) => x !== id))
+                  }
+                  onShare={shareArtifact}
                   currentUser={settings?.currentUser ?? ''}
                   suggestRecurring={recurringSuggested}
                   onChange={(artifacts: Artifact[]) => {
@@ -397,11 +446,13 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                     if (updated) notify(`Updated ${updated} organization-defined value(s) from recurring evidence`, 'info');
                   }}
                 />
+                  )}
+                </form.Subscribe>
               )}
             </form.Field>
           </SectionCard>
 
-          {initial.odpResponses.length > 0 && (
+          {!isNa && initial.odpResponses.length > 0 && (
             <SectionCard
               title="Organization-defined values"
               subtitle="These are the blanks the control leaves to the organization. An assessor will look for each one."
@@ -454,54 +505,6 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
             </SectionCard>
           )}
 
-          {initial.objectiveResponses.length > 0 && (
-            <SectionCard
-              title="Assessment objectives"
-              subtitle="The 800-53A determination statements an assessor tests; every one must be met for the control to pass. Running the AI assessment answers each objective — Met or Not met with an explanation — and fills in this section; those answers drive the AI's rating of this control, and answered objectives count toward its completeness score. Review each answer, correct it where needed, and note where the supporting evidence lives."
-            >
-              {initial.objectiveResponses.map((objective, index) => (
-                <Box key={objective.objectiveIndex}>
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
-                    <form.Field name={`objectiveResponses[${index}].met`}>
-                      {(field) => (
-                        <ToggleButtonGroup
-                          exclusive
-                          size="small"
-                          value={field.state.value}
-                          onChange={(_e, next: boolean | null) => field.handleChange(next)}
-                          sx={{ flexShrink: 0 }}
-                        >
-                          <ToggleButton value={true} color="success" sx={{ px: 1, py: 0.25 }}>
-                            Met
-                          </ToggleButton>
-                          <ToggleButton value={false} color="error" sx={{ px: 1, py: 0.25 }}>
-                            Not met
-                          </ToggleButton>
-                        </ToggleButtonGroup>
-                      )}
-                    </form.Field>
-                    <Typography variant="body2" sx={{ pt: 0.5 }}>
-                      <strong>{index + 1}.</strong> {node.assessmentObjectives[index]}
-                    </Typography>
-                  </Stack>
-                  <form.Field name={`objectiveResponses[${index}].note`}>
-                    {(field) => (
-                      <TextField
-                        fullWidth
-                        size="small"
-                        multiline
-                        placeholder="Answer the objective and note where the evidence for it lives — or run the AI assessment to draft an answer."
-                        sx={{ mt: 1 }}
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                      />
-                    )}
-                  </form.Field>
-                </Box>
-              ))}
-            </SectionCard>
-          )}
-
           <SectionCard title="Ownership">
             <Stack direction="row" spacing={2}>
               <form.Field name="ownership.responsibleRole">
@@ -511,7 +514,14 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                     fullWidth
                     label="Responsible role"
                     value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
+                    onChange={(e) => {
+                      field.handleChange(e.target.value);
+                      const contact = settings?.roleContacts?.[e.target.value];
+                      if (contact) {
+                        form.setFieldValue('ownership.owner', contact.name);
+                        form.setFieldValue('ownership.poc', contact.email);
+                      }
+                    }}
                   >
                     <MenuItem value="">
                       <em>Not assigned</em>
@@ -531,7 +541,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                 {(field) => (
                   <TextField
                     fullWidth
-                    label="Named owner"
+                    label="Name"
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
@@ -541,7 +551,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                 {(field) => (
                   <TextField
                     fullWidth
-                    label="Point of contact"
+                    label="Email"
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
@@ -550,6 +560,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
             </Stack>
           </SectionCard>
 
+          {!isNa && (
           <SectionCard
             title="Dates"
             subtitle="Evidence-as-of drives the staleness warnings and the pre-ATO evidence check."
@@ -577,7 +588,9 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
               ))}
             </Stack>
           </SectionCard>
+          )}
 
+          {!isNa && (
           <SectionCard title="Finding / POA&amp;M">
             <form.Field name="poam.hasFinding">
               {(field) => (
@@ -677,7 +690,57 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
               }
             </form.Subscribe>
           </SectionCard>
+          )}
 
+          {!isNa && initial.objectiveResponses.length > 0 && (
+            <SectionCard
+              title="Assessment objectives"
+              subtitle="The 800-53A determination statements an assessor tests; every one must be met for the control to pass. Running the AI assessment answers each objective — Met or Not met with an explanation — and fills in this section; those answers drive the AI's rating of this control, and answered objectives count toward its completeness score. Review each answer, correct it where needed, and note where the supporting evidence lives."
+            >
+              {initial.objectiveResponses.map((objective, index) => (
+                <Box key={objective.objectiveIndex}>
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+                    <form.Field name={`objectiveResponses[${index}].met`}>
+                      {(field) => (
+                        <ToggleButtonGroup
+                          exclusive
+                          size="small"
+                          value={field.state.value}
+                          onChange={(_e, next: boolean | null) => field.handleChange(next)}
+                          sx={{ flexShrink: 0 }}
+                        >
+                          <ToggleButton value={true} color="success" sx={{ px: 1, py: 0.25 }}>
+                            Met
+                          </ToggleButton>
+                          <ToggleButton value={false} color="error" sx={{ px: 1, py: 0.25 }}>
+                            Not met
+                          </ToggleButton>
+                        </ToggleButtonGroup>
+                      )}
+                    </form.Field>
+                    <Typography variant="body2" sx={{ pt: 0.5 }}>
+                      <strong>{index + 1}.</strong> {node.assessmentObjectives[index]}
+                    </Typography>
+                  </Stack>
+                  <form.Field name={`objectiveResponses[${index}].note`}>
+                    {(field) => (
+                      <TextField
+                        fullWidth
+                        size="small"
+                        multiline
+                        placeholder="Answer the objective and note where the evidence for it lives — or run the AI assessment to draft an answer."
+                        sx={{ mt: 1 }}
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                      />
+                    )}
+                  </form.Field>
+                </Box>
+              ))}
+            </SectionCard>
+          )}
+
+          {!isNa && (
           <SectionCard title="AI Assessment">
             <AiPanel
               evaluation={form.state.values.aiEvaluations?.[form.state.values.aiEvaluations.length - 1] ?? null}
@@ -686,6 +749,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
               onEditPrompt={handleOpenPromptEditor}
             />
           </SectionCard>
+          )}
         </Stack>
       </Box>
 
@@ -696,8 +760,8 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
         sx={{ alignItems: 'center', px: 2, py: 1, bgcolor: 'background.paper', flexShrink: 0 }}
       >
         <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-          <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: scoreColour(completeness) }} />
-          <Typography variant="caption">{completeness}% complete</Typography>
+          <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: isNa ? statusColour('not_applicable') : scoreColour(completeness) }} />
+          <Typography variant="caption">{isNa ? 'Not applicable' : `${completeness}% complete`}</Typography>
         </Stack>
 
         <Box sx={{ flexGrow: 1 }} />
@@ -728,6 +792,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
           size="small"
           variant="contained"
           startIcon={<CheckCircleIcon />}
+          disabled={isNa}
           onClick={() => {
             form.setFieldValue('implementationStatus', 'implemented');
             form.setFieldValue('dates.lastReviewedOn', DateTime.now().toISODate());

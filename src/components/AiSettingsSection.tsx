@@ -119,16 +119,13 @@ export function AiSettingsSection({ value, onChange }: AiSettingsSectionProps) {
           size="small"
           label="Connection"
           sx={{ maxWidth: 420 }}
-          value={!openai ? 'azure-entra' : value.openaiService === 'azure' ? 'azure-key' : 'openai'}
+          value={openai && value.openaiService === 'openai' ? 'openai' : 'azure-key'}
           onChange={(e) => {
-            const choice = e.target.value;
-            if (choice === 'azure-entra') patch({ provider: 'azure-openai' });
-            else patch({ provider: 'tanstack-openai', openaiService: choice === 'azure-key' ? 'azure' : 'openai' });
+            patch({ provider: 'tanstack-openai', openaiService: e.target.value === 'azure-key' ? 'azure' : 'openai' });
             setResult(null);
           }}
         >
           <MenuItem value="azure-key">Azure OpenAI &mdash; API key</MenuItem>
-          <MenuItem value="azure-entra">Azure OpenAI &mdash; Microsoft Entra sign-in</MenuItem>
           <MenuItem value="openai">OpenAI &mdash; API key</MenuItem>
         </TextField>
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   Box,
@@ -24,10 +25,13 @@ import EventRepeatIcon from '@mui/icons-material/EventRepeat';
 import RestoreIcon from '@mui/icons-material/Restore';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import FolderZipIcon from '@mui/icons-material/FolderZip';
-import type { ExportRequest, OscalImportResult } from '@shared/types';
+import SettingsBackupRestoreIcon from '@mui/icons-material/SettingsBackupRestore';
+import StorageIcon from '@mui/icons-material/Storage';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import type { ExportRequest, FileActionResult, OscalImportResult } from '@shared/types';
 import { recordsToOscal } from '@shared/oscal';
 import { api } from '@/api/client';
-import { useExportFile, useImportBackup, useSaveEvidence, useWorkspaceData } from '@/api/queries';
+import { useDataAction, useExportFile, useSaveEvidence, useWorkspace, useWorkspaceData } from '@/api/queries';
 import { useAppState } from '@/state/AppState';
 import { buildCsv, buildJsonBackup, buildRecurringCsv, buildSspLiteMarkdown } from '@/domain/export';
 import { planOscalImport, type OscalImportPlan } from '@/domain/oscalImport';
@@ -43,9 +47,14 @@ interface ExportOption {
 }
 
 export function Export() {
-  const { index, evidence, settings } = useWorkspaceData();
+  const { index, evidence, rawEvidence, settings } = useWorkspaceData();
   const exportFile = useExportFile();
-  const importBackup = useImportBackup();
+  const workspace = useWorkspace();
+  const backupConfig = useDataAction(api.backupConfig);
+  const restoreConfig = useDataAction(api.restoreConfig);
+  const backupDb = useDataAction(api.backupDatabase);
+  const restoreDb = useDataAction(api.restoreDatabase);
+  const client = useQueryClient();
   const saveEvidence = useSaveEvidence();
   const { notify } = useAppState();
   const [pendingFormat, setPendingFormat] = useState<ExportFormat | null>(null);
@@ -71,7 +80,7 @@ export function Export() {
     {
       format: 'json',
       title: 'JSON backup',
-      detail: 'Every evidence record, verbatim. Restore it with "Import backup" below.',
+      detail: 'Every evidence record, verbatim, for archiving or inspection. Use the database backup to restore.',
       icon: <BackupIcon />,
       suggestedName: (id) => `${id}-evidence-backup.json`,
     },
@@ -103,9 +112,9 @@ export function Export() {
     if (!index || !settings) return null;
     switch (format) {
       case 'oscal':
-        return JSON.stringify(recordsToOscal(Object.values(evidence), settings).ssp, null, 2);
+        return JSON.stringify(recordsToOscal(Object.values(rawEvidence), settings).ssp, null, 2);
       case 'json':
-        return buildJsonBackup(evidence);
+        return buildJsonBackup(rawEvidence);
       case 'csv':
         return buildCsv(index, evidence);
       case 'markdown':
@@ -171,12 +180,26 @@ export function Export() {
     }
   };
 
-  const handleImport = async () => {
+  const runDataAction = async (
+    action: { mutateAsync: () => Promise<FileActionResult> },
+    done: string,
+  ) => {
     try {
-      const result = await importBackup.mutateAsync();
-      if (!result.cancelled) notify('Backup imported', 'success');
+      const result = await action.mutateAsync();
+      if (!result.cancelled) notify(`${done}: ${result.path}`, 'success');
     } catch (error) {
-      notify(error instanceof Error ? error.message : 'Import failed', 'error');
+      notify(error instanceof Error ? error.message : 'Action failed', 'error');
+    }
+  };
+
+  const changeLocation = async (pick: () => Promise<unknown>) => {
+    try {
+      if (await pick()) {
+        await client.resetQueries();
+        notify('Workspace location changed. Existing data was not moved.', 'success');
+      }
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Could not change the workspace location', 'error');
     }
   };
 
@@ -186,7 +209,7 @@ export function Export() {
     try {
       const result = await api.importOscalSsp();
       if (result.cancelled) return;
-      setSnPreview({ result, plan: planOscalImport(result, index, evidence, settings?.currentUser ?? '') });
+      setSnPreview({ result, plan: planOscalImport(result, index, rawEvidence, settings?.currentUser ?? '') });
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Import failed', 'error');
     } finally {
@@ -244,30 +267,6 @@ export function Export() {
           <Stack direction="row" spacing={2} useFlexGap sx={{ alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <Box>
               <Typography variant="h6" gutterBottom>
-                Import backup
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Restore evidence records from a JSON backup file. Existing records with the same control id are
-                replaced.
-              </Typography>
-            </Box>
-            <Chip label="Overwrites matching records" size="small" variant="outlined" />
-          </Stack>
-          <Button
-            variant="outlined"
-            startIcon={<RestoreIcon />}
-            sx={{ mt: 2 }}
-            disabled={importBackup.isPending}
-            onClick={() => void handleImport()}
-          >
-            {importBackup.isPending ? 'Importing…' : 'Choose backup file…'}
-          </Button>
-        </Paper>
-
-        <Paper variant="outlined" sx={{ p: 3 }}>
-          <Stack direction="row" spacing={2} useFlexGap sx={{ alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-            <Box>
-              <Typography variant="h6" gutterBottom>
                 Import ServiceNow OSCAL SSP
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -288,6 +287,95 @@ export function Export() {
           >
             {snPicking ? 'Reading…' : 'Choose ServiceNow OSCAL file…'}
           </Button>
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Backup / restore config file
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            The settings JSON file (system details, AI connection, prompt template). Restoring replaces the current settings.
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<SettingsBackupRestoreIcon />}
+              disabled={backupConfig.isPending}
+              onClick={() => void runDataAction(backupConfig, 'Config backed up to')}
+            >
+              Backup…
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<RestoreIcon />}
+              disabled={restoreConfig.isPending}
+              onClick={() => void runDataAction(restoreConfig, 'Config restored from')}
+            >
+              Restore…
+            </Button>
+          </Stack>
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Stack direction="row" spacing={2} useFlexGap sx={{ alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Backup / restore SQLite database
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                A consistent copy of the evidence database. Attachment files are not included; copy the attachments folder
+                separately.
+              </Typography>
+            </Box>
+            <Chip label="Restore overwrites all evidence" size="small" variant="outlined" />
+          </Stack>
+          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<StorageIcon />}
+              disabled={backupDb.isPending}
+              onClick={() => void runDataAction(backupDb, 'Database backed up to')}
+            >
+              Backup…
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<RestoreIcon />}
+              disabled={restoreDb.isPending}
+              onClick={() => void runDataAction(restoreDb, 'Database restored from')}
+            >
+              Restore…
+            </Button>
+          </Stack>
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Workspace location
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            The folder holding the database, settings file and attachments. Changing it starts from whatever is already in
+            the new folder; existing data is not moved.
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1, wordBreak: 'break-all', fontFamily: 'monospace' }}>
+            {workspace.data?.root ?? '…'}
+          </Typography>
+          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+            <Button
+              variant="outlined"
+              startIcon={<FolderOpenIcon />}
+              onClick={() => void changeLocation(api.chooseWorkspaceLocation)}
+            >
+              Change…
+            </Button>
+            <Button
+              variant="text"
+              disabled={!workspace.data || workspace.data.root === workspace.data.defaultRoot}
+              onClick={() => void changeLocation(api.resetWorkspaceLocation)}
+            >
+              Use default
+            </Button>
+          </Stack>
         </Paper>
         </Stack>
       </Stack>

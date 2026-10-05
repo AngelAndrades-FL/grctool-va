@@ -21,7 +21,7 @@ import type { ImplementationStatus } from '@shared/types';
 import { useWorkspaceData } from '@/api/queries';
 import { useAppState } from '@/state/AppState';
 import { isNodeInBaseline } from '@/domain/catalogIndex';
-import { buildGapReport, computeCompleteness, evidenceTypeCoverage } from '@/domain/completeness';
+import { buildGapReport, computeCompleteness, evidenceTypeCoverage, isDocumentedNa } from '@/domain/completeness';
 import { allRecurringRows } from '@/domain/recurringRollup';
 import { STATUS_LABEL as RECURRING_STATUS_LABEL, statusSeverity } from '@shared/recurring';
 import { scoreColour, statusColour } from '@/theme';
@@ -113,15 +113,24 @@ export function Dashboard() {
     let stale = 0;
     let openFindings = 0;
     let scoreTotal = 0;
+    let notApplicable = 0;
+    let naMissingRationale = 0;
 
     for (const node of nodes) {
       const record = evidence[node.id];
+      const status = record?.implementationStatus ?? 'not_started';
+      statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+      if (status === 'not_applicable') {
+        notApplicable += 1;
+        if (!isDocumentedNa(record)) naMissingRationale += 1;
+      }
+      // Documented N/A controls are out of every coverage, gap, staleness and review metric.
+      if (isDocumentedNa(record)) continue;
+
       const score = computeCompleteness(node, record);
       const gaps = buildGapReport(node, record, { staleAfterDays, lastAtoDate });
-      const status = record?.implementationStatus ?? 'not_started';
 
       scoreTotal += score;
-      statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
       if (score >= COMPLETE_THRESHOLD) complete += 1;
       if (!record || status === 'not_started') notStarted += 1;
       if (gaps.stale) stale += 1;
@@ -162,15 +171,19 @@ export function Dashboard() {
       ? Math.ceil(DateTime.fromISO(settings.nextAtoDate).diffNow('days').days)
       : null;
 
+    const applicable = nodes.length - (notApplicable - naMissingRationale);
+
     return {
-      total: nodes.length,
+      total: applicable,
+      notApplicable,
+      naMissingRationale,
       complete,
-      incomplete: nodes.length - complete,
+      incomplete: applicable - complete,
       notStarted,
       stale,
       openFindings,
-      averageScore: nodes.length === 0 ? 0 : Math.round(scoreTotal / nodes.length),
-      coveragePercent: nodes.length === 0 ? 0 : Math.round((complete / nodes.length) * 100),
+      averageScore: applicable === 0 ? 0 : Math.round(scoreTotal / applicable),
+      coveragePercent: applicable === 0 ? 0 : Math.round((complete / applicable) * 100),
       daysToAto,
       statusCounts,
       familyTotals,
@@ -286,8 +299,10 @@ export function Dashboard() {
         <Box>
           <Typography variant="h6">Dashboard</Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            NIST SP 800-53 Rev 5 ·{' '}
             {baseline === 'All' ? 'All controls' : `${baseline} baseline`} ·{' '}
-            {mode === 'va' ? 'VA 6500 overlay' : 'NIST 800-53B'} · {stats.total} controls in scope
+            {mode === 'va' ? 'VA 6500 overlay' : 'NIST 800-53B'} · {stats.total} applicable controls
+            {stats.notApplicable > 0 && ` · ${stats.notApplicable} not applicable`}
           </Typography>
         </Box>
 
@@ -302,37 +317,43 @@ export function Dashboard() {
         )}
 
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6, md: 3 }}>
+          <Grid size={12}>
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' } }}>
             <StatCard
               label="Days to next ATO"
               value={stats.daysToAto === null ? '—' : String(stats.daysToAto)}
               caption={settings?.nextAtoDate ?? 'Set the next ATO date in Settings'}
               colour={atoColour}
             />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
             <StatCard
               label="Controls complete"
               value={`${stats.complete} / ${stats.total}`}
               caption={`${stats.incomplete} below ${COMPLETE_THRESHOLD}% · ${stats.notStarted} not started`}
               colour={scoreColour(stats.coveragePercent)}
             />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
+            <StatCard
+              label="Not applicable"
+              value={String(stats.notApplicable)}
+              caption={
+                stats.naMissingRationale > 0
+                  ? `${stats.naMissingRationale} still need a rationale (see Gaps)`
+                  : 'Excluded from coverage; rationale documented'
+              }
+              colour={stats.naMissingRationale > 0 ? '#ffa726' : undefined}
+            />
             <StatCard
               label="Stale evidence"
               value={String(stats.stale)}
               caption={`Older than ${settings?.evidenceStaleAfterDays ?? 365} days or predating the last ATO`}
               colour={stats.stale > 0 ? '#ffa726' : '#43a047'}
             />
-          </Grid>
-          <Grid size={{ xs: 6, md: 3 }}>
             <StatCard
               label="Open findings"
               value={String(stats.openFindings)}
               caption="Controls carrying an open POA&M item"
               colour={stats.openFindings > 0 ? '#ef5350' : '#43a047'}
             />
+            </Box>
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
@@ -355,13 +376,13 @@ export function Dashboard() {
                 />
               </Box>
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', textAlign: 'center' }}>
-                Average completeness across all in-scope controls: {stats.averageScore}%
+                Average completeness across all applicable controls: {stats.averageScore}%
               </Typography>
             </ChartCard>
           </Grid>
 
           <Grid size={{ xs: 12, md: 8 }}>
-            <ChartCard title="Implementation status" subtitle="Every in-scope control by recorded status">
+            <ChartCard title="Implementation status" subtitle="Every applicable control by recorded status, plus those marked N/A">
               <PieChart
                 height={230}
                 series={[

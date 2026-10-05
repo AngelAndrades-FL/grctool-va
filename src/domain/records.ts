@@ -16,11 +16,15 @@ export function seedRecord(node: ControlNode, existing?: EvidenceRecord): Eviden
 
   return {
     ...base,
+    // Records from before the "in scope" toggle was retired: out of scope means not applicable.
+    implementationStatus: base.inScope === false ? 'not_applicable' : base.implementationStatus,
+    inScope: true,
     familyId: node.familyId,
     isEnhancement: node.isEnhancement,
     parentControlId: node.parentId,
     // Records stored before these fields existed load without them.
     poam: { ...base.poam, artifactIds: base.poam?.artifactIds ?? [] },
+    linkedArtifactIds: base.linkedArtifactIds ?? [],
     odpResponses: requiredOdp(node).map((param) => ({
       parameterId: param.parameterId,
       label: param.label,

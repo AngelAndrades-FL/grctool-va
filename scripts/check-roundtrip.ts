@@ -180,7 +180,10 @@ const check = (label: string, actual: unknown, expected: unknown) => {
   }
 };
 
-const original = [populated('AC-2'), populated('AC-2(1)'), emptyRecord('AU-6')];
+// Artifact ids are unique per owning control, so the second record gets its own.
+const second = populated('AC-2(1)');
+second.artifacts = second.artifacts.map((a) => ({ ...a, id: `${a.id}-b` }));
+const original = [populated('AC-2'), second, emptyRecord('AU-6')];
 const { ssp, supplemental } = recordsToOscal(original, settings);
 const restored = oscalToRecords(ssp, supplemental);
 
@@ -265,6 +268,20 @@ console.log('\n--- legacy recurring requirements fold into artifacts ---');
   check('older file becomes history', merged[0]?.recurrence?.history.map((c) => [c.cycleLabel, c.filePath]), [['FY2025', 'attachments/AT/old.pdf']]);
   check('unlinked artifact untouched', merged[1]?.recurrence, undefined);
   check('empty requirement becomes placeholder', [merged[2]?.recurrence?.frequencyType, merged[2]?.filePath], ['quarterly', undefined]);
+}
+
+console.log('\n--- shared artifacts ---');
+{
+  const owner = emptyRecord('AC-1');
+  owner.artifacts = [{ id: 'shared-1', evidenceType: 'Policy', title: 'Shared policy', description: '', kind: 'url', url: 'https://example.test/p' }];
+  const linker = { ...emptyRecord('IR-1'), linkedArtifactIds: ['shared-1', 'missing'], ownership: { responsibleRole: '', owner: '', poc: 'a@b.test' } };
+  const out = recordsToOscal([owner, linker], settings);
+  const back = oscalToRecords(out.ssp, out.supplemental);
+  check('shared resource written once', out.ssp['system-security-plan']['back-matter']?.resources.filter((r) => r.uuid === 'shared-1').length, 1);
+  check('owner keeps artifact', back.find((r) => r.controlId === 'AC-1')?.artifacts.map((a) => a.id), ['shared-1']);
+  check('linker has no own artifact', back.find((r) => r.controlId === 'IR-1')?.artifacts, []);
+  check('linker links survive, dangling dropped', back.find((r) => r.controlId === 'IR-1')?.linkedArtifactIds, ['shared-1']);
+  check('poc survives', back.find((r) => r.controlId === 'IR-1')?.ownership.poc, 'a@b.test');
 }
 
 console.log(`\n${failures === 0 ? 'ROUND TRIP CLEAN' : `${failures} FIELD(S) LOST OR MUTATED`}`);

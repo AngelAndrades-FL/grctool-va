@@ -12,14 +12,15 @@ import type {
   AttachmentRenameRequest,
   AttachmentRequest,
   AttachmentResult,
-  EvidenceMap,
   EvidenceRecord,
   ExportRequest,
+  FileActionResult,
   OscalImportResult,
   OscalPackageRequest,
   OscalPackageResult,
   ScriptRunRequest,
   ScriptRunResult,
+  WorkspaceInfo,
 } from '../shared/types.js';
 import { draftFromRelated, evaluate, revise } from '../shared/ai.js';
 import { OSCAL_VERSION, type OscalSsp } from '../shared/oscal.js';
@@ -229,19 +230,75 @@ function registerHandlers(): void {
     return { cancelled: false, path: result.filePath, fileCount: files.length, missing };
   });
 
-  handle('import:backup', async (): Promise<{ cancelled: boolean; evidence?: EvidenceMap }> => {
+  handle('config:backup', async (): Promise<FileActionResult> => {
+    if (!win) return { cancelled: true };
+    const result = await dialog.showSaveDialog(win, {
+      title: 'Back up config file',
+      defaultPath: 'grctool-settings.json',
+      filters: [{ name: 'JSON config', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return { cancelled: true };
+    await store.backupConfig(result.filePath);
+    return { cancelled: false, path: result.filePath };
+  });
+
+  handle('config:restore', async (): Promise<FileActionResult> => {
     if (!win) return { cancelled: true };
     const result = await dialog.showOpenDialog(win, {
-      title: 'Import evidence backup',
+      title: 'Restore config file',
       properties: ['openFile'],
-      filters: [{ name: 'JSON backup', extensions: ['json'] }],
+      filters: [{ name: 'JSON config', extensions: ['json'] }],
     });
     if (result.canceled || !result.filePaths[0]) return { cancelled: true };
-    const raw: unknown = JSON.parse(await fs.readFile(result.filePaths[0], 'utf8'));
-    const wrapper = raw as { records?: EvidenceMap };
-    const evidence = wrapper.records ?? (raw as EvidenceMap);
-    return { cancelled: false, evidence };
+    await store.restoreConfig(result.filePaths[0]);
+    return { cancelled: false, path: result.filePaths[0] };
   });
+
+  handle('db:backup', async (): Promise<FileActionResult> => {
+    if (!win) return { cancelled: true };
+    const result = await dialog.showSaveDialog(win, {
+      title: 'Back up SQLite database',
+      defaultPath: 'grctool-backup.db',
+      filters: [{ name: 'SQLite database', extensions: ['db', 'sqlite'] }],
+    });
+    if (result.canceled || !result.filePath) return { cancelled: true };
+    await store.backupDatabase(result.filePath);
+    return { cancelled: false, path: result.filePath };
+  });
+
+  handle('db:restore', async (): Promise<FileActionResult> => {
+    if (!win) return { cancelled: true };
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Restore SQLite database',
+      properties: ['openFile'],
+      filters: [{ name: 'SQLite database', extensions: ['db', 'sqlite'] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return { cancelled: true };
+    const confirmation = await dialog.showMessageBox(win, {
+      type: 'warning',
+      buttons: ['Restore', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'Restore database',
+      message: 'Replace the current database with this backup?',
+      detail: 'All evidence currently in the workspace database will be overwritten.',
+      noLink: true,
+    });
+    if (confirmation.response !== 0) return { cancelled: true };
+    await store.restoreDatabase(result.filePaths[0]);
+    return { cancelled: false, path: result.filePaths[0] };
+  });
+
+  handle('workspace:choose', async (): Promise<WorkspaceInfo | null> => {
+    if (!win) return null;
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Choose workspace folder',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return store.setWorkspaceRoot(result.filePaths[0]);
+  });
+  handle('workspace:reset', () => store.setWorkspaceRoot(null));
 
   handle('import:oscal', async (): Promise<OscalImportResult> => {
     if (!win) return { cancelled: true };
