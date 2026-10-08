@@ -205,22 +205,20 @@ export interface ProcessStep {
 }
 
 export interface Ownership {
-  /** One of `RESPONSIBLE_ROLES` ids (an OSCAL role-id token); older records may hold free text. */
+  /** The `id` of one of the settings' responsible roles (an OSCAL role-id token); older records may hold free text. */
   responsibleRole: string;
   owner: string;
   poc: string;
 }
 
-/** Responsible roles offered in the Ownership section; `id` is written to the OSCAL SSP as `role-id`. */
-export const RESPONSIBLE_ROLES = [
-  { id: 'authorizing-official', label: 'Authorizing Official (AO)' },
-  { id: 'information-system-security-officer', label: 'Information System Security Officer (ISSO)' },
-  { id: 'system-owner', label: 'System Owner (SO)' },
-  { id: 'information-owner', label: 'Information Owner/Steward' },
-  { id: 'common-control-provider', label: 'Common Control Provider' },
-  { id: 'security-control-assessor', label: 'Security Control Assessor (SCA)' },
-  { id: 'privacy-officer', label: 'Privacy Officer' },
-] as const;
+/** A responsible role offered in the Ownership section, with the default contact filled in when it is chosen. */
+export interface ResponsibleRole {
+  /** Written to the OSCAL SSP as `role-id`; fixed once created. */
+  id: string;
+  label: string;
+  name: string;
+  email: string;
+}
 
 export interface EvidenceDates {
   implementedOn: string | null;
@@ -375,8 +373,8 @@ export interface AppSettings {
   promptVersion: number;
   promptHistory: PromptVersion[];
   themeMode: 'light' | 'dark';
-  /** Default name and email per `RESPONSIBLE_ROLES` id, applied when a role is chosen on a control. */
-  roleContacts: Record<string, { name: string; email: string }>;
+  /** Roles offered on a control, each with a default name and email applied when it is chosen. */
+  responsibleRoles: ResponsibleRole[];
   ai: AiSettings;
 }
 
@@ -403,6 +401,8 @@ export interface AiSettings {
   /** Null lets the service decide. */
   maxOutputTokens: number | null;
   timeoutSeconds: number;
+  /** Per-narrative character cap when drafting from related controls; longer narratives are truncated in the prompt. */
+  relatedNarrativeMaxChars: number;
   /** Ask the service to guarantee a JSON reply (`response_format: json_object`). */
   jsonMode: boolean;
   /** TanStack AI OpenAI adapter: model id, e.g. gpt-5.2. The API key is stored encrypted by the main process, never here. */
@@ -489,6 +489,8 @@ export interface AiRelatedDraftRequest {
   supplementalGuidance: string;
   currentNarrative: string;
   related: RelatedNarrative[];
+  /** Set by the main process from AI settings; overrides the default per-narrative cap. */
+  maxNarrativeChars?: number;
 }
 
 export interface RelatedDraftElement {
@@ -506,8 +508,33 @@ export interface AiRelatedDraft {
   renderedPrompt: string;
 }
 
+export interface AiOdpSuggestRequest {
+  controlId: string;
+  controlName: string;
+  /** Verbatim 800-53 statement with its lettered items and [Assignment] blanks. */
+  statementTemplate: string;
+  narrative: string;
+  responsibleRole: string;
+  owner: string;
+  /** Evidence artifacts already attached to the control. */
+  artifacts: Array<{ title: string; evidenceType: string; frequency: string }>;
+  /** The blanks still to fill. */
+  parameters: Array<{ parameterId: string; label: string }>;
+}
+
+export interface OdpSuggestion {
+  parameterId: string;
+  value: string;
+  /** Where in the control's own information the value was found. */
+  basis: string;
+}
+
+export interface AiOdpSuggestions {
+  suggestions: OdpSuggestion[];
+}
+
 export interface ExportRequest {
-  format: 'oscal' | 'json' | 'csv' | 'markdown' | 'recurring-csv';
+  format: 'oscal' | 'csv' | 'markdown' | 'recurring-csv';
   contents: string;
   suggestedName: string;
 }
@@ -604,6 +631,42 @@ export interface ScriptRunResult {
   artifact?: Pick<Artifact, 'filePath' | 'fileName' | 'mimeType' | 'sizeBytes' | 'sha256'>;
 }
 
+/** One top-level bullet of a control narrative, with any list items beneath it. */
+export interface SopBullet {
+  bullet_text: string;
+  sub_bullets: Array<{ text: string }>;
+}
+
+export interface SopControlInput {
+  id: string;
+  name: string;
+  narrative: SopBullet[];
+  /** File names of the evidence artifacts held for the control. */
+  artifacts: string[];
+  enhancements: Array<{ id: string; name: string; narrative: SopBullet[]; artifacts: string[] }>;
+}
+
+export interface SopFamilyInput {
+  familyId: string;
+  familyName: string;
+  controls: SopControlInput[];
+}
+
+export interface SopExportRequest {
+  families: SopFamilyInput[];
+}
+
+export interface WipeResult {
+  recordsDeleted: number;
+  filesDeleted: number;
+}
+
+export interface SopExportResult {
+  cancelled: boolean;
+  path?: string;
+  familyCount?: number;
+}
+
 /** The surface exposed on `window.grc` by the preload bridge. */
 export interface GrcBridge {
   getWorkspace(): Promise<WorkspaceInfo>;
@@ -622,8 +685,12 @@ export interface GrcBridge {
   aiEvaluate(req: AiEvaluateRequest): Promise<AiEvaluation>;
   aiRevise(req: AiReviseRequest): Promise<AiRevision>;
   aiRelatedDraft(req: AiRelatedDraftRequest): Promise<AiRelatedDraft>;
+  aiSuggestOdp(req: AiOdpSuggestRequest): Promise<AiOdpSuggestions>;
   exportFile(req: ExportRequest): Promise<{ cancelled: boolean; path?: string }>;
   exportOscalPackage(req: OscalPackageRequest): Promise<OscalPackageResult>;
+  exportSopWord(req: SopExportRequest): Promise<SopExportResult>;
+  /** Deletes all attachments and control data; `confirmation` must be the word DELETE. */
+  wipeControlData(confirmation: string): Promise<WipeResult>;
   importOscalSsp(): Promise<OscalImportResult>;
   backupConfig(): Promise<FileActionResult>;
   restoreConfig(): Promise<FileActionResult>;

@@ -18,6 +18,7 @@ import type {
   WorkspaceInfo,
 } from '../shared/types.js';
 import { DEFAULT_PROMPT_TEMPLATE } from '../shared/ai.js';
+import { LEGACY_COMMON_CONTROL_PROVIDER, defaultResponsibleRoles } from '../shared/roles.js';
 import {
   oscalToRecords,
   readAtoDates,
@@ -44,7 +45,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   promptVersion: 1,
   promptHistory: [],
   themeMode: 'light',
-  roleContacts: {},
+  responsibleRoles: defaultResponsibleRoles(),
   ai: {
     provider: 'tanstack-openai',
     endpoint: '',
@@ -57,6 +58,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     temperature: 0.2,
     maxOutputTokens: 4000,
     timeoutSeconds: 120,
+    relatedNarrativeMaxChars: 12000,
     jsonMode: true,
     openaiModel: 'gpt-5.2',
     openaiService: 'azure',
@@ -189,7 +191,7 @@ export function ensureWorkspace(): Promise<WorkspaceInfo> {
   return ensurePromise;
 }
 
-function bundledCatalogFile(name: string): string {
+export function bundledCatalogFile(name: string): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'catalog', name)
     : path.join(app.getAppPath(), 'catalog', name);
@@ -290,7 +292,10 @@ interface CsfGuidanceFile {
 export async function loadSettings(): Promise<AppSettings> {
   const ws = await ensureWorkspace();
   const handle = db!;
-  const stored = await readJson<Partial<AppSettings>>(ws.settingsPath);
+  const { roleContacts: legacyContacts, ...stored } =
+    (await readJson<Partial<AppSettings> & { roleContacts?: Record<string, { name: string; email: string }> }>(
+      ws.settingsPath,
+    )) ?? {};
   const provider: AiProvider = 'tanstack-openai';
   // Entra sign-in was removed; settings saved with it fall back to Azure OpenAI with an API key.
   const openaiService = stored?.ai?.provider === 'tanstack-openai' ? stored.ai.openaiService : 'azure';
@@ -298,6 +303,16 @@ export async function loadSettings(): Promise<AppSettings> {
     ...DEFAULT_SETTINGS,
     ...stored,
     ai: { ...DEFAULT_SETTINGS.ai, ...stored?.ai, provider, ...(openaiService ? { openaiService } : {}) },
+    // Settings saved before roles were editable kept one contact per role id; the old single
+    // Common Control Provider contact is applied to each per-family role.
+    responsibleRoles:
+      stored.responsibleRoles ??
+      defaultResponsibleRoles().map((role) => {
+        const contact =
+          legacyContacts?.[role.id] ??
+          (role.id.endsWith(`-${LEGACY_COMMON_CONTROL_PROVIDER}`) ? legacyContacts?.[LEGACY_COMMON_CONTROL_PROVIDER] : undefined);
+        return contact ? { ...role, name: contact.name, email: contact.email } : role;
+      }),
   };
   // The SSP is authoritative for authorization dates.
   const ssp = readDoc<OscalSsp>(handle, SSP_DOC);
@@ -524,6 +539,31 @@ export function resolveInWorkspace(relPath: string): string | null {
 
 export async function readRawSsp(): Promise<OscalSsp | null> {
   return readDoc<OscalSsp>(await database(), SSP_DOC);
+}
+
+async function countFiles(dir: string): Promise<number> {
+  let count = 0;
+  for (const entry of await fs.readdir(dir, { withFileTypes: true }).catch(() => [])) {
+    count += entry.isDirectory() ? await countFiles(path.join(dir, entry.name)) : 1;
+  }
+  return count;
+}
+
+/** Delete every attachment file and every control record; settings, roles and the catalog are kept. */
+export async function wipeControlData(): Promise<{ recordsDeleted: number; filesDeleted: number }> {
+  const ws = await ensureWorkspace();
+  const handle = await database();
+  const attachmentsRoot = path.resolve(ws.attachmentsDir);
+  if (path.basename(attachmentsRoot) !== 'attachments' || path.dirname(attachmentsRoot) !== path.resolve(ws.root)) {
+    throw new Error('The attachments folder is not where it was expected, so nothing was deleted.');
+  }
+
+  const recordsDeleted = Object.keys(await loadEvidence()).length;
+  const filesDeleted = await countFiles(attachmentsRoot);
+  await fs.rm(attachmentsRoot, { recursive: true, force: true });
+  await fs.mkdir(attachmentsRoot, { recursive: true });
+  handle.prepare('DELETE FROM documents WHERE name IN (?, ?)').run(SSP_DOC, SUPPLEMENTAL_DOC);
+  return { recordsDeleted, filesDeleted };
 }
 
 export async function replaceEvidence(records: EvidenceRecord[]): Promise<void> {

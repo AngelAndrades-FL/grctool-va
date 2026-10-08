@@ -6,6 +6,8 @@
 import type {
   AiEvaluateRequest,
   AiEvaluation,
+  AiOdpSuggestions,
+  AiOdpSuggestRequest,
   AiRelatedDraft,
   AiRelatedDraftRequest,
   AiReviseRequest,
@@ -23,6 +25,7 @@ import type {
   OscalPackageRequest,
   ScriptRunRequest,
   ScriptRunResult,
+  SopExportRequest,
   WorkspaceInfo,
 } from '@shared/types';
 
@@ -51,6 +54,7 @@ export const api = {
   aiEvaluate: (req: AiEvaluateRequest): Promise<AiEvaluation> => bridge().aiEvaluate(req),
   aiRevise: (req: AiReviseRequest): Promise<AiRevision> => bridge().aiRevise(req),
   aiRelatedDraft: (req: AiRelatedDraftRequest): Promise<AiRelatedDraft> => bridge().aiRelatedDraft(req),
+  aiSuggestOdp: (req: AiOdpSuggestRequest): Promise<AiOdpSuggestions> => bridge().aiSuggestOdp(req),
   aiTestConnection: (settings: AiSettings): Promise<AiConnectionTestResult> => bridge().aiTestConnection(settings),
   aiSignOut: (): Promise<void> => bridge().aiSignOut(),
   aiSignIn: (settings: AiSettings): Promise<string | null> => bridge().aiSignIn(settings),
@@ -60,6 +64,8 @@ export const api = {
   aiHasApiKey: (): Promise<boolean> => bridge().aiHasApiKey(),
   exportFile: (req: ExportRequest) => bridge().exportFile(req),
   exportOscalPackage: (req: OscalPackageRequest) => bridge().exportOscalPackage(req),
+  exportSopWord: (req: SopExportRequest) => bridge().exportSopWord(req),
+  wipeControlData: (confirmation: string) => bridge().wipeControlData(confirmation),
   backupConfig: () => bridge().backupConfig(),
   restoreConfig: () => bridge().restoreConfig(),
   backupDatabase: () => bridge().backupDatabase(),

@@ -53,7 +53,9 @@ export function evidenceTypeCoverage(node: ControlNode, record?: EvidenceRecord)
   };
 }
 
-export function requiredOdp(node: ControlNode): Array<{ parameterId: string; label: string; source: 'nist' | 'va' }> {
+export function requiredOdp(
+  node: ControlNode,
+): Array<{ parameterId: string; label: string; source: 'nist' | 'va'; defaultValue?: string }> {
   const nist = node.parameters.map((p) => ({
     parameterId: p.parameterId,
     label: p.description,
@@ -63,6 +65,7 @@ export function requiredOdp(node: ControlNode): Array<{ parameterId: string; lab
     parameterId: `${node.id}_va_${i}`,
     label: v.parameter,
     source: 'va' as const,
+    defaultValue: v.value,
   }));
   return [...nist, ...va];
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Accordion,
   AccordionDetails,
@@ -10,6 +10,7 @@ import {
   Divider,
   Drawer,
   IconButton,
+  LinearProgress,
   Paper,
   Stack,
   Tooltip,
@@ -19,7 +20,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import type { AiRelatedDraft, RelatedNarrative } from '@shared/types';
+import type { AiRelatedDraft, RelatedDraftElement, RelatedNarrative } from '@shared/types';
 import { formatRelatedDraft } from '@shared/ai';
 import type { ControlNode } from '@/domain/catalogIndex';
 import { useAiRelatedDraft, useCatalogIndex, useEvidence } from '@/api/queries';
@@ -34,6 +35,21 @@ export interface RelatedControlsDrawerProps {
   onClose: () => void;
 }
 
+const normalize = (text: string) => text.replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** Folds one step's elements into the running set, merging text for an element that was already drafted. */
+function mergeElements(into: RelatedDraftElement[], incoming: RelatedDraftElement[]): void {
+  for (const el of incoming) {
+    const existing = el.element ? into.find((e) => normalize(e.element) === normalize(el.element)) : undefined;
+    if (existing) {
+      existing.draft = `${existing.draft}\n${el.draft}`;
+      existing.sources = [...new Set([...existing.sources, ...el.sources])];
+    } else {
+      into.push({ ...el, sources: [...el.sources] });
+    }
+  }
+}
+
 export function RelatedControlsDrawer({ open, node, currentNarrative, onClose }: RelatedControlsDrawerProps) {
   const { data: index } = useCatalogIndex();
   const { data: evidence } = useEvidence();
@@ -42,11 +58,16 @@ export function RelatedControlsDrawer({ open, node, currentNarrative, onClose }:
   const [draft, setDraft] = useState<AiRelatedDraft | null>(null);
   const [edited, setEdited] = useState<{ json: string; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number; controlId: string } | null>(null);
+  const runToken = useRef(0);
+  const running = progress !== null;
 
   useEffect(() => {
+    runToken.current++;
     setDraft(null);
     setEdited(null);
     setError(null);
+    setProgress(null);
   }, [node.id]);
 
   const related = useMemo<RelatedNarrative[]>(() => {
@@ -62,27 +83,57 @@ export function RelatedControlsDrawer({ open, node, currentNarrative, onClose }:
 
   const withNarrative = related.filter((r) => r.narrative);
 
-  const run = () => {
+  /** Submits one related narrative at a time; each step sees the current narrative plus everything drafted so far. */
+  const run = async () => {
     setError(null);
-    generate.mutate(
-      {
-        controlId: node.id,
-        controlName: node.name,
-        controlStatement: node.statement,
-        statementTemplate: node.statementVerbatim || node.statement,
-        supplementalGuidance: node.supplementalGuidance || node.discussion,
-        currentNarrative,
-        related: withNarrative,
-      },
-      {
-        onSuccess: (result) => {
-          const text = formatRelatedDraft(result);
-          setDraft(result);
-          setEdited({ json: linesToEditorState(text), text });
-        },
-        onError: (err) => setError(err instanceof Error ? err.message : 'Draft generation failed.'),
-      },
-    );
+    const token = ++runToken.current;
+    const cancelled = () => runToken.current !== token;
+    const total = withNarrative.length;
+    const elements: RelatedDraftElement[] = [];
+    const gapSets: string[][] = [];
+    const prompts: string[] = [];
+    let failure: string | null = null;
+
+    for (let i = 0; i < total && !cancelled(); i++) {
+      const step = withNarrative[i]!;
+      setProgress({ done: i, total, controlId: step.controlId });
+      const working = [currentNarrative.trim(), formatRelatedDraft({ elements })].filter(Boolean).join('\n\n');
+      try {
+        const result = await generate.mutateAsync({
+          controlId: node.id,
+          controlName: node.name,
+          controlStatement: node.statement,
+          statementTemplate: node.statementVerbatim || node.statement,
+          supplementalGuidance: node.supplementalGuidance || node.discussion,
+          currentNarrative: working,
+          related: [step],
+        });
+        if (cancelled()) break;
+        mergeElements(elements, result.elements);
+        gapSets.push(result.gaps);
+        prompts.push(`===== Step ${i + 1} of ${total}: ${step.controlId} =====\n${result.renderedPrompt}`);
+      } catch (err) {
+        failure = err instanceof Error ? err.message : 'Draft generation failed.';
+        break;
+      }
+    }
+
+    if (cancelled()) return;
+    setProgress(null);
+    if (failure) setError(`${failure}${elements.length ? ' Showing the draft built so far.' : ''}`);
+    if (!gapSets.length) return;
+    // An element is a gap only if no related narrative supported it.
+    const [first = [], ...rest] = gapSets;
+    const gaps = first.filter((g) => rest.every((set) => set.some((s) => normalize(s) === normalize(g))));
+    const result: AiRelatedDraft = { elements, gaps, renderedPrompt: prompts.join('\n\n') };
+    const text = formatRelatedDraft(result);
+    setDraft(result);
+    setEdited({ json: linesToEditorState(text), text });
+  };
+
+  const stop = () => {
+    runToken.current++;
+    setProgress(null);
   };
 
   const copy = async () => {
@@ -112,20 +163,34 @@ export function RelatedControlsDrawer({ open, node, currentNarrative, onClose }:
             <Stack spacing={1.5}>
               <Typography variant="subtitle2">Draft from related narratives</Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                Uses AI to draft text for {node.id}, one statement element at a time, from what the related controls
-                already implement. Elements the related narratives do not support are listed as gaps.
+                Uses AI to draft text for {node.id} from what the related controls already implement. Related
+                narratives are submitted one at a time alongside the current narrative and the draft built so far, so
+                each step builds on the last. Elements no related narrative supports are listed as gaps.
               </Typography>
-              <Box>
+              <Stack direction="row" spacing={1}>
                 <Button
                   size="small"
                   variant="contained"
-                  startIcon={generate.isPending ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
-                  disabled={generate.isPending || withNarrative.length === 0}
-                  onClick={run}
+                  startIcon={running ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
+                  disabled={running || withNarrative.length === 0}
+                  onClick={() => void run()}
                 >
                   {draft ? 'Regenerate' : 'Generate partial narrative'}
                 </Button>
-              </Box>
+                {running && (
+                  <Button size="small" onClick={stop}>
+                    Stop
+                  </Button>
+                )}
+              </Stack>
+              {progress && (
+                <Box>
+                  <LinearProgress variant="determinate" value={(progress.done / progress.total) * 100} />
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    Step {progress.done + 1} of {progress.total}: reviewing {progress.controlId}
+                  </Typography>
+                </Box>
+              )}
               {withNarrative.length === 0 && (
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                   None of the related controls has an implementation narrative yet.

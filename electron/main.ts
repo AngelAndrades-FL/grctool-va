@@ -5,6 +5,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type {
   AiEvaluateRequest,
+  AiOdpSuggestRequest,
   AiRelatedDraftRequest,
   AiReviseRequest,
   AiSettings,
@@ -20,6 +21,8 @@ import type {
   OscalPackageResult,
   ScriptRunRequest,
   ScriptRunResult,
+  SopExportRequest,
+  SopExportResult,
   WorkspaceInfo,
 } from '../shared/types.js';
 import { draftFromRelated, evaluate, revise } from '../shared/ai.js';
@@ -30,6 +33,7 @@ import * as aiClient from './aiClient.js';
 import * as tanstackAi from './tanstackAiClient.js';
 import * as store from './storage.js';
 import { runScript } from './scripts.js';
+import { writeSopDocument } from './sopExport.js';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path.join(dirname, '..');
@@ -125,6 +129,11 @@ function registerHandlers(): void {
   handle('attachments:read', (relPath: string) => store.readAttachment(relPath));
   handle('attachments:rename', (req: AttachmentRenameRequest) => store.renameAttachment(req));
   handle('attachments:delete', (relPaths: string[]) => store.deleteAttachments(relPaths));
+
+  handle('data:wipe', async (confirmation: string) => {
+    if (confirmation !== 'DELETE') throw new Error('Deletion was not confirmed.');
+    return store.wipeControlData();
+  });
   handle('attachments:reveal', async (relPath: string) => {
     const absolute = store.resolveInWorkspace(relPath);
     if (absolute) shell.showItemInFolder(absolute);
@@ -183,12 +192,20 @@ function registerHandlers(): void {
     return revise(req);
   });
 
-  handle('ai:relatedDraft', async (req: AiRelatedDraftRequest) => {
+  handle('ai:relatedDraft', async (input: AiRelatedDraftRequest) => {
     const settings = await store.loadSettings();
+    const req = { ...input, maxNarrativeChars: settings.ai.relatedNarrativeMaxChars };
     if (settings.ai.provider === 'azure-openai') return aiClient.relatedDraftWithAzure(req, settings.ai);
     if (settings.ai.provider === 'tanstack-openai') return tanstackAi.relatedDraftWithOpenai(req, settings.ai);
     await new Promise((resolve) => setTimeout(resolve, 600));
     return draftFromRelated(req);
+  });
+
+  handle('ai:suggestOdp', async (req: AiOdpSuggestRequest) => {
+    const settings = await store.loadSettings();
+    if (settings.ai.provider === 'azure-openai') return aiClient.suggestOdpWithAzure(req, settings.ai);
+    if (settings.ai.provider === 'tanstack-openai') return tanstackAi.suggestOdpWithOpenai(req, settings.ai);
+    return { suggestions: [] };
   });
 
   handle('ai:test', (ai: AiSettings) =>
@@ -228,6 +245,19 @@ function registerHandlers(): void {
       ...files.map((f) => ({ name: f.href, path: f.absolute })),
     ]);
     return { cancelled: false, path: result.filePath, fileCount: files.length, missing };
+  });
+
+  handle('export:sopWord', async (req: SopExportRequest): Promise<SopExportResult> => {
+    if (!win) return { cancelled: true };
+    const settings = await store.loadSettings();
+    const result = await dialog.showSaveDialog(win, {
+      title: 'Export POM',
+      defaultPath: `${settings.systemId || 'system'}-pom.docx`,
+      filters: [{ name: 'Word document', extensions: ['docx'] }],
+    });
+    if (result.canceled || !result.filePath) return { cancelled: true };
+    await writeSopDocument(req, result.filePath);
+    return { cancelled: false, path: result.filePath, familyCount: req.families.length };
   });
 
   handle('config:backup', async (): Promise<FileActionResult> => {

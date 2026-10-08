@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useForm, useStore } from '@tanstack/react-form';
 import {
+  Alert,
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -30,14 +32,15 @@ import UndoIcon from '@mui/icons-material/Undo';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined';
 import { DateTime } from 'luxon';
-import { IMPLEMENTATION_STATUSES, RESPONSIBLE_ROLES, type Artifact, type AiEvaluateRequest, type AiReviseRequest, type EvidenceRecord, type ImplementationStatus } from '@shared/types';
+import { IMPLEMENTATION_STATUSES, type Artifact, type AiEvaluateRequest, type AiReviseRequest, type EvidenceRecord, type ImplementationStatus } from '@shared/types';
 import { renderPrompt, DEFAULT_PROMPT_TEMPLATE } from '@shared/ai';
-import { frequencySuggestions, suggestsRecurringEvidence } from '@shared/recurring';
+import { frequencySuggestions, suggestsRecurringEvidence, FREQUENCY_LABEL } from '@shared/recurring';
 import type { ControlNode } from '@/domain/catalogIndex';
 import { seedRecord } from '@/domain/records';
+import { roleSuggestions } from '@/domain/odpSuggestions';
 import { validateEvidenceRules } from '@/domain/evidenceSchema';
-import { computeCompleteness, atoMinDate } from '@/domain/completeness';
-import { useSaveEvidence, useSettings, useAiEvaluate, useEvidence, useCatalogIndex } from '@/api/queries';
+import { computeCompleteness, atoMinDate, requiredOdp } from '@/domain/completeness';
+import { useSaveEvidence, useSettings, useAiEvaluate, useAiSuggestOdp, useEvidence, useCatalogIndex } from '@/api/queries';
 import { artifactOwners } from '@/domain/sharedArtifacts';
 import { useAppState } from '@/state/AppState';
 import { scoreColour, statusColour } from '@/theme';
@@ -90,6 +93,9 @@ function isoToDate(value: string | null): DateTime | null {
 export function EvidenceForm({ node, record }: { node: ControlNode; record?: EvidenceRecord }) {
   const saveEvidence = useSaveEvidence();
   const aiEvaluate = useAiEvaluate();
+  const suggestOdp = useAiSuggestOdp();
+  const [aiOdp, setAiOdp] = useState<Record<string, { value: string; basis: string }>>({});
+  const [aiOdpError, setAiOdpError] = useState<string | null>(null);
   const { data: settings } = useSettings();
   const { data: allEvidence } = useEvidence();
   const { data: catalogIndex } = useCatalogIndex();
@@ -232,6 +238,45 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
 
   const ruleErrors = validateEvidenceRules(form.state.values) ?? {};
   const isNa = useStore(form.store, (state) => state.values.implementationStatus === 'not_applicable');
+  const responsibleRole = useStore(form.store, (state) => state.values.ownership.responsibleRole);
+  const hasEmptyOdp = useStore(form.store, (state) => state.values.odpResponses.some((o) => !o.value.trim()));
+
+  const runSuggestOdp = () => {
+    const values = form.state.values;
+    const parameters = values.odpResponses
+      .filter((o) => !o.value.trim())
+      .map((o) => ({ parameterId: o.parameterId, label: o.label }));
+    if (!parameters.length) return;
+    setAiOdpError(null);
+    suggestOdp.mutate(
+      {
+        controlId: node.id,
+        controlName: node.name,
+        statementTemplate: node.statementVerbatim || node.statement,
+        narrative: values.narrative.implementation.text,
+        responsibleRole: values.ownership.responsibleRole,
+        owner: values.ownership.owner,
+        artifacts: values.artifacts.map((a) => ({
+          title: a.title,
+          evidenceType: a.evidenceType,
+          frequency: a.recurrence ? a.recurrence.frequencyDetail.trim() || FREQUENCY_LABEL[a.recurrence.frequencyType] : '',
+        })),
+        parameters,
+      },
+      {
+        onSuccess: ({ suggestions }) => {
+          setAiOdp(Object.fromEntries(suggestions.map((s) => [s.parameterId, { value: s.value, basis: s.basis }])));
+          notify(
+            suggestions.length
+              ? `AI found ${suggestions.length} value(s) stated in this control. Review each before using it.`
+              : 'This control does not state any of the remaining values.',
+            'info',
+          );
+        },
+        onError: (err) => setAiOdpError(err instanceof Error ? err.message : 'Suggestion failed.'),
+      },
+    );
+  };
   const completeness = computeCompleteness(node, form.state.values);
   const minEvidenceDate = atoMinDate(settings?.lastAtoDate);
   const recurringSuggested = useMemo(
@@ -457,14 +502,72 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
               title="Organization-defined values"
               subtitle="These are the blanks the control leaves to the organization. An assessor will look for each one."
             >
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={suggestOdp.isPending ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
+                  disabled={suggestOdp.isPending || !hasEmptyOdp}
+                  onClick={runSuggestOdp}
+                >
+                  Suggest remaining values
+                </Button>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  AI looks only at this control&apos;s narrative, owner and evidence. Nothing is filled in until you choose it.
+                </Typography>
+              </Stack>
+              {aiOdpError && (
+                <Alert severity="error" onClose={() => setAiOdpError(null)}>
+                  {aiOdpError}
+                </Alert>
+              )}
               {initial.odpResponses.map((param, index) => (
                 <form.Field key={param.parameterId} name={`odpResponses[${index}].value`}>
                   {(field) => (
                     <form.Subscribe selector={(state) => state.values.artifacts}>
                       {(artifacts) => {
+                        const current = field.state.value.trim();
                         const suggestions = frequencySuggestions(param.label, artifacts);
-                        const matched = suggestions.find((s) => s.text === field.state.value.trim());
+                        const matched = suggestions.find((s) => s.text === current);
                         const offered = !matched ? suggestions[0] : undefined;
+                        const vaDefault = requiredOdp(node).find((p) => p.parameterId === param.parameterId)?.defaultValue;
+                        const extras = current
+                          ? []
+                          : [
+                              ...roleSuggestions(param.label, responsibleRole, settings?.responsibleRoles).map((s) => ({
+                                ...s,
+                                label: s.basis,
+                              })),
+                              ...(aiOdp[param.parameterId]
+                                ? [
+                                    {
+                                      text: aiOdp[param.parameterId]!.value,
+                                      basis: aiOdp[param.parameterId]!.basis,
+                                      label: `AI, from ${aiOdp[param.parameterId]!.basis || 'this control'}`,
+                                    },
+                                  ]
+                                : []),
+                            ];
+                        const notes = [
+                          matched ? <>From recurring evidence: “{matched.artifactTitle}”</> : null,
+                          offered ? (
+                            <>
+                              From recurring evidence: “{offered.artifactTitle}” uses “{offered.text}” —{' '}
+                              <Link component="button" type="button" variant="caption" onClick={() => field.handleChange(offered.text)}>
+                                use this
+                              </Link>
+                            </>
+                          ) : null,
+                          vaDefault && current === vaDefault.trim() ? <>VA-defined value</> : null,
+                          ...extras.map((s) => (
+                            <>
+                              {s.label}: “{s.text}” —{' '}
+                              <Link component="button" type="button" variant="caption" onClick={() => field.handleChange(s.text)}>
+                                use this
+                              </Link>
+                            </>
+                          )),
+                        ].filter((n) => n !== null);
                         return (
                           <TextField
                             fullWidth
@@ -472,14 +575,13 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                             value={field.state.value}
                             onChange={(e) => field.handleChange(e.target.value)}
                             helperText={
-                              matched ? (
-                                `From recurring evidence: “${matched.artifactTitle}”`
-                              ) : offered ? (
+                              notes.length ? (
                                 <>
-                                  From recurring evidence: “{offered.artifactTitle}” uses “{offered.text}” —{' '}
-                                  <Link component="button" type="button" variant="caption" onClick={() => field.handleChange(offered.text)}>
-                                    use this
-                                  </Link>
+                                  {notes.map((note, i) => (
+                                    <Box key={i} component="span" sx={{ display: 'block' }}>
+                                      {note}
+                                    </Box>
+                                  ))}
                                 </>
                               ) : undefined
                             }
@@ -516,22 +618,22 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                     value={field.state.value}
                     onChange={(e) => {
                       field.handleChange(e.target.value);
-                      const contact = settings?.roleContacts?.[e.target.value];
-                      if (contact) {
-                        form.setFieldValue('ownership.owner', contact.name);
-                        form.setFieldValue('ownership.poc', contact.email);
+                      const picked = settings?.responsibleRoles.find((r) => r.id === e.target.value);
+                      if (picked && (picked.name || picked.email)) {
+                        form.setFieldValue('ownership.owner', picked.name);
+                        form.setFieldValue('ownership.poc', picked.email);
                       }
                     }}
                   >
                     <MenuItem value="">
                       <em>Not assigned</em>
                     </MenuItem>
-                    {RESPONSIBLE_ROLES.map((role) => (
+                    {(settings?.responsibleRoles ?? []).map((role) => (
                       <MenuItem key={role.id} value={role.id}>
                         {role.label}
                       </MenuItem>
                     ))}
-                    {field.state.value && !RESPONSIBLE_ROLES.some((r) => r.id === field.state.value) && (
+                    {field.state.value && !settings?.responsibleRoles.some((r) => r.id === field.state.value) && (
                       <MenuItem value={field.state.value}>{field.state.value} (previously entered)</MenuItem>
                     )}
                   </TextField>

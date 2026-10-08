@@ -29,7 +29,7 @@ export function seedRecord(node: ControlNode, existing?: EvidenceRecord): Eviden
       parameterId: param.parameterId,
       label: param.label,
       source: param.source,
-      value: priorOdp.get(param.parameterId)?.value ?? '',
+      value: priorOdp.get(param.parameterId)?.value || param.defaultValue || '',
     })),
     objectiveResponses: node.assessmentObjectives.map((_objective, index) => ({
       objectiveIndex: index,

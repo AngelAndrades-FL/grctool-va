@@ -14,6 +14,8 @@ import type {
   AiConnectionTestResult,
   AiEvaluateRequest,
   AiEvaluation,
+  AiOdpSuggestions,
+  AiOdpSuggestRequest,
   AiRelatedDraft,
   AiRelatedDraftRequest,
   AiReviseRequest,
@@ -22,8 +24,10 @@ import type {
 } from '../shared/types.js';
 import {
   evaluationFromResponse,
+  parseOdpSuggestResponse,
   parseRelatedDraftResponse,
   parseRevisionResponse,
+  renderOdpSuggestPrompt,
   renderPrompt,
   renderRelatedDraftPrompt,
   renderRevisePrompt,
@@ -262,6 +266,14 @@ export async function relatedDraftWithOpenai(req: AiRelatedDraftRequest, ai: AiS
   try {
     const text = await complete(ai, renderedPrompt, true);
     return { ...parseRelatedDraftResponse(text), renderedPrompt };
+  } catch (error) {
+    rethrow(error);
+  }
+}
+
+export async function suggestOdpWithOpenai(req: AiOdpSuggestRequest, ai: AiSettings): Promise<AiOdpSuggestions> {
+  try {
+    return parseOdpSuggestResponse(await complete(ai, renderOdpSuggestPrompt(req), true), req);
   } catch (error) {
     rethrow(error);
   }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
   Alert,
@@ -6,12 +6,16 @@ import {
   Chip,
   Divider,
   Grid,
+  IconButton,
   LinearProgress,
   Paper,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid, type GridColDef, type GridRowParams } from '@mui/x-data-grid';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { PieChart } from '@mui/x-charts/PieChart';
@@ -49,19 +53,65 @@ interface MissingEvidenceRow {
   missingCount: number;
 }
 
+interface DrillRow {
+  id: string;
+  name: string;
+  familyId: string;
+  status: ImplementationStatus;
+  /** Null for not-applicable controls, which have no score. */
+  completeness: number | null;
+  artifacts: number;
+  detail: string;
+}
+
+type DrillKey = 'complete' | 'notApplicable' | 'stale' | 'findings';
+
+const DRILL_TITLE: Record<DrillKey, { title: string; detail: string }> = {
+  complete: { title: 'Controls complete', detail: 'Missing evidence' },
+  notApplicable: { title: 'Not applicable', detail: 'Rationale' },
+  stale: { title: 'Stale evidence', detail: 'Why it is stale' },
+  findings: { title: 'Open findings', detail: 'POA&M item' },
+};
+
 function StatCard({
   label,
   value,
   caption,
   colour,
+  onClick,
+  active,
 }: {
   label: string;
   value: string;
   caption?: string;
   colour?: string;
+  /** Makes the card a button that opens the matching list. */
+  onClick?: () => void;
+  active?: boolean;
 }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+    <Paper
+      variant="outlined"
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-pressed={onClick ? Boolean(active) : undefined}
+      sx={{
+        p: 2,
+        height: '100%',
+        ...(onClick && {
+          cursor: 'pointer',
+          '&:hover': { borderColor: 'primary.main' },
+          ...(active && { borderColor: 'primary.main', boxShadow: (theme) => `inset 0 0 0 1px ${theme.palette.primary.main}` }),
+        }),
+      }}
+    >
       <Typography variant="overline" sx={{ color: 'text.secondary' }}>
         {label}
       </Typography>
@@ -95,6 +145,9 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { index, evidence, settings, isLoading } = useWorkspaceData();
   const { baseline, mode } = useAppState();
+  const [drillKey, setDrillKey] = useState<DrillKey | null>(null);
+  const [completeView, setCompleteView] = useState<'complete' | 'incomplete'>('complete');
+  const toggleDrill = (key: DrillKey) => setDrillKey((current) => (current === key ? null : key));
 
   const stats = useMemo(() => {
     if (!index) return null;
@@ -106,6 +159,13 @@ export function Dashboard() {
     const statusCounts = new Map<ImplementationStatus, number>();
     const familyTotals = new Map<string, { complete: number; incomplete: number }>();
     const missingEvidence: MissingEvidenceRow[] = [];
+    const drill = {
+      complete: [] as DrillRow[],
+      incomplete: [] as DrillRow[],
+      notApplicable: [] as DrillRow[],
+      stale: [] as DrillRow[],
+      findings: [] as DrillRow[],
+    };
     const reviewBuckets = { overdue: 0, in30: 0, in90: 0, later: 0, unscheduled: 0 };
 
     let complete = 0;
@@ -123,6 +183,15 @@ export function Dashboard() {
       if (status === 'not_applicable') {
         notApplicable += 1;
         if (!isDocumentedNa(record)) naMissingRationale += 1;
+        drill.notApplicable.push({
+          id: node.id,
+          name: node.name,
+          familyId: node.familyId,
+          status,
+          completeness: null,
+          artifacts: record?.artifacts.length ?? 0,
+          detail: record?.naJustification.trim() || 'Rationale missing',
+        });
       }
       // Documented N/A controls are out of every coverage, gap, staleness and review metric.
       if (isDocumentedNa(record)) continue;
@@ -136,6 +205,27 @@ export function Dashboard() {
       if (gaps.stale) stale += 1;
       if (record?.poam.hasFinding) openFindings += 1;
 
+      const drillRow = (detail: string): DrillRow => ({
+        id: node.id,
+        name: node.name,
+        familyId: node.familyId,
+        status,
+        completeness: score,
+        artifacts: record?.artifacts.length ?? 0,
+        detail,
+      });
+      if (gaps.stale) {
+        drill.stale.push(
+          drillRow(gaps.staleByDays !== null ? `Evidence is ${gaps.staleByDays} days old` : `Predates the last ATO (${lastAtoDate ?? 'not set'})`),
+        );
+      }
+      if (record?.poam.hasFinding) {
+        const { findingId, severity, dueDate } = record.poam;
+        drill.findings.push(
+          drillRow([findingId, severity, dueDate ? `due ${dueDate}` : ''].filter(Boolean).join(' · ') || 'Open POA&M item'),
+        );
+      }
+
       const bucket = familyTotals.get(node.familyId) ?? { complete: 0, incomplete: 0 };
       if (score >= COMPLETE_THRESHOLD) bucket.complete += 1;
       else bucket.incomplete += 1;
@@ -143,6 +233,9 @@ export function Dashboard() {
 
       const coverage = evidenceTypeCoverage(node, record);
       const artifacts = record?.artifacts.length ?? 0;
+      (score >= COMPLETE_THRESHOLD ? drill.complete : drill.incomplete).push(
+        drillRow(coverage.missing.join(', ') || (score >= COMPLETE_THRESHOLD ? 'None' : gaps.reasons.join(' ') || 'None')),
+      );
       if (coverage.missing.length > 0 || (node.evidenceRequired.length === 0 && artifacts === 0)) {
         missingEvidence.push({
           id: node.id,
@@ -195,6 +288,7 @@ export function Dashboard() {
         .slice(0, 12),
       missingEvidence: missingEvidence.sort((a, b) => a.completeness - b.completeness),
       reviewBuckets,
+      drill,
     };
   }, [index, evidence, settings, baseline, mode]);
 
@@ -273,6 +367,49 @@ export function Dashboard() {
     );
   }
 
+  const drillRows: DrillRow[] = drillKey ? (drillKey === 'complete' ? stats.drill[completeView] : stats.drill[drillKey]) : [];
+  const drillDetailHeader =
+    drillKey === 'complete' ? (completeView === 'complete' ? 'Missing evidence' : 'Gaps') : drillKey ? DRILL_TITLE[drillKey].detail : '';
+  const drillColumns: GridColDef<DrillRow>[] = [
+    { field: 'id', headerName: 'Control', width: 120 },
+    { field: 'familyId', headerName: 'Family', width: 90 },
+    { field: 'name', headerName: 'Name', flex: 1, minWidth: 180 },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      renderCell: (params) => (
+        <Chip
+          label={STATUS_LABEL[params.row.status]}
+          size="small"
+          sx={{ bgcolor: statusColour(params.row.status), color: '#fff', height: 20, fontSize: 11 }}
+        />
+      ),
+    },
+    {
+      field: 'completeness',
+      headerName: 'Complete',
+      width: 100,
+      type: 'number',
+      valueFormatter: (value: number | null) => (value === null ? '—' : `${value}%`),
+    },
+    { field: 'artifacts', headerName: 'Artifacts', width: 85, type: 'number' },
+    {
+      field: 'detail',
+      headerName: drillDetailHeader,
+      flex: 1.6,
+      minWidth: 240,
+      sortable: false,
+      renderCell: (params) => (
+        <Tooltip title={params.row.detail}>
+          <Typography variant="caption" noWrap sx={{ display: 'block' }}>
+            {params.row.detail}
+          </Typography>
+        </Tooltip>
+      ),
+    },
+  ];
+
   const atoColour =
     stats.daysToAto === null
       ? undefined
@@ -330,6 +467,8 @@ export function Dashboard() {
               value={`${stats.complete} / ${stats.total}`}
               caption={`${stats.incomplete} below ${COMPLETE_THRESHOLD}% · ${stats.notStarted} not started`}
               colour={scoreColour(stats.coveragePercent)}
+              onClick={() => toggleDrill('complete')}
+              active={drillKey === 'complete'}
             />
             <StatCard
               label="Not applicable"
@@ -340,21 +479,77 @@ export function Dashboard() {
                   : 'Excluded from coverage; rationale documented'
               }
               colour={stats.naMissingRationale > 0 ? '#ffa726' : undefined}
+              onClick={() => toggleDrill('notApplicable')}
+              active={drillKey === 'notApplicable'}
             />
             <StatCard
               label="Stale evidence"
               value={String(stats.stale)}
               caption={`Older than ${settings?.evidenceStaleAfterDays ?? 365} days or predating the last ATO`}
               colour={stats.stale > 0 ? '#ffa726' : '#43a047'}
+              onClick={() => toggleDrill('stale')}
+              active={drillKey === 'stale'}
             />
             <StatCard
               label="Open findings"
               value={String(stats.openFindings)}
               caption="Controls carrying an open POA&M item"
               colour={stats.openFindings > 0 ? '#ef5350' : '#43a047'}
+              onClick={() => toggleDrill('findings')}
+              active={drillKey === 'findings'}
             />
             </Box>
           </Grid>
+
+          {drillKey && (
+            <Grid size={12}>
+              <Paper variant="outlined" sx={{ p: 2 }}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="subtitle2">
+                      {DRILL_TITLE[drillKey].title} · {drillRows.length} control{drillRows.length === 1 ? '' : 's'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Select a row to open the control.
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    {drillKey === 'complete' && (
+                      <ToggleButtonGroup
+                        exclusive
+                        size="small"
+                        value={completeView}
+                        onChange={(_e, value: 'complete' | 'incomplete' | null) => value && setCompleteView(value)}
+                      >
+                        <ToggleButton value="complete">Complete ({stats.drill.complete.length})</ToggleButton>
+                        <ToggleButton value="incomplete">Below {COMPLETE_THRESHOLD}% ({stats.drill.incomplete.length})</ToggleButton>
+                      </ToggleButtonGroup>
+                    )}
+                    <Tooltip title="Close">
+                      <IconButton size="small" onClick={() => setDrillKey(null)} aria-label="Close list">
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                </Stack>
+                <Box sx={{ height: 380, mt: 1 }}>
+                  <DataGrid<DrillRow>
+                    rows={drillRows}
+                    columns={drillColumns}
+                    showToolbar
+                    density="compact"
+                    disableRowSelectionOnClick
+                    onRowClick={(params: GridRowParams<DrillRow>) =>
+                      void navigate({ to: '/control/$controlId', params: { controlId: params.row.id } })
+                    }
+                    initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                    pageSizeOptions={[10, 25, 50]}
+                    sx={{ border: 0, '& .MuiDataGrid-row': { cursor: 'pointer' } }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+          )}
 
           <Grid size={{ xs: 12, md: 4 }}>
             <ChartCard

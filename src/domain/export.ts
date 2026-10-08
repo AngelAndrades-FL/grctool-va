@@ -9,14 +9,6 @@ function csvCell(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-export function buildJsonBackup(evidence: EvidenceMap): string {
-  return JSON.stringify(
-    { schema: 'grctool/backup', version: 1, exportedAt: new Date().toISOString(), records: evidence },
-    null,
-    2,
-  );
-}
-
 export function buildCsv(index: CatalogIndex, evidence: EvidenceMap): string {
   const header = [
     'Control ID',

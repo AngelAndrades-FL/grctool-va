@@ -310,6 +310,26 @@ export function AiSettingsSection({ value, onChange }: AiSettingsSectionProps) {
 
         {(azure || openai) && (
           <>
+            <TextField
+              size="small"
+              type="number"
+              label="Request timeout (seconds)"
+              helperText="Raise this if long prompts, such as related-controls drafts, time out."
+              sx={{ maxWidth: 420 }}
+              slotProps={{ htmlInput: { min: 5, step: 10 } }}
+              value={value.timeoutSeconds}
+              onChange={(e) => patch({ timeoutSeconds: Math.max(5, Number(e.target.value) || 120) })}
+            />
+            <TextField
+              size="small"
+              type="number"
+              label="Related narrative limit (characters)"
+              helperText="Related Controls drafting sends each related control's narrative to the model, truncated to this length. Higher values keep more detail but increase request size, cost and time, and may exceed the model's context window when a control has many related controls."
+              sx={{ maxWidth: 420 }}
+              slotProps={{ htmlInput: { min: 500, step: 1000 } }}
+              value={value.relatedNarrativeMaxChars}
+              onChange={(e) => patch({ relatedNarrativeMaxChars: Math.max(500, Number(e.target.value) || 12000) })}
+            />
             <Box>
               <Button
                 variant="outlined"

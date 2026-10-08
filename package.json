@@ -12,7 +12,8 @@
     "check:baseline": "node scripts/check-baseline.mjs",
     "catalog:csf": "node --use-system-ca scripts/fetch-csf-guidance.mjs",
     "check:roundtrip": "rolldown scripts/check-roundtrip.ts --platform node --format esm --file node_modules/.tmp/check-roundtrip.mjs && node node_modules/.tmp/check-roundtrip.mjs",
-    "check": "npm run typecheck && npm run check:baseline && npm run check:roundtrip",
+    "check:sop": "rolldown scripts/check-sop.ts --platform node --format esm --file node_modules/.tmp/check-sop.mjs && node node_modules/.tmp/check-sop.mjs",
+    "check": "npm run typecheck && npm run check:baseline && npm run check:roundtrip && npm run check:sop",
     "preview": "vite preview",
     "package": "npm run build && electron-builder"
   },
@@ -38,11 +39,13 @@
     "@tanstack/react-router": "^1.170.39",
     "arktype": "^2.2.3",
     "better-sqlite3": "^13.0.3",
+    "docxtemplater": "^3.71.0",
     "fflate": "^0.8.3",
     "lexical": "^0.51.0",
     "luxon": "^3.7.2",
     "mermaid": "^12.0.0",
     "openai": "^7.25.0",
+    "pizzip": "^3.3.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "uuid": "^14.0.2"

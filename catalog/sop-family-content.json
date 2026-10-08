@@ -1,0 +1,978 @@
+{
+  "AC": {
+    "familyNumber": 1,
+    "purpose": "The purpose of this Standard Operating Procedure (SOP) is to establish procedures that ensure access controls adhere to VA directives, VA Knowledge Service policies, and National Institute of Standards and Technology (NIST) standards and guidelines. This SOP is intended for those responsible for managing, using, accessing, or operating the VA PARS information system.",
+    "scope": "This SOP is applicable to all staff involved in the implementation and management of access controls to include the account management lifecycle.",
+    "policy": "",
+    "roles": [
+      {
+        "name": "Information System Owner (ISO)",
+        "responsibilities": [
+          "Ensure adherence to access control policies by key Office of Information and Technology (OIT) staff.",
+          "Oversee personnel with significant responsibility for information systems.",
+          "Update procedures as needed to ensure they meet OIT mission requirements and comply with federal laws, policies, procedures, and guidelines.",
+          "Ensure all procedures herein are properly followed."
+        ]
+      },
+      {
+        "name": "Information Systems Security Officer (ISSO)",
+        "responsibilities": [
+          "Monitor and audit access controls to ensure adherence to VA Knowledge Service."
+        ]
+      },
+      {
+        "name": "Account Managers/OIT Support Staff",
+        "responsibilities": [
+          "Manage the entire lifecycle of accounts (e.g., create, enable, modify, disable, and remove) for the information systems to ensure compliance with account management.",
+          "Promptly take appropriate actions on accounts as requested."
+        ]
+      },
+      {
+        "name": "Contracting Officer Representative (COR)",
+        "responsibilities": [
+          "Designate individuals to act as a liaison between OIT Account Managers and the service to authorize and submit access requests.",
+          "Ensure all access requests comply with background investigation completion, training, and Rules of Behavior (ROB) completion prior to request.",
+          "Promptly report changes on a user’s employment status or change of duties to OIT staff to ensure all accounts are acted on appropriately."
+        ]
+      },
+      {
+        "name": "Product Owner",
+        "responsibilities": [
+          "Monitor and audit access controls to ensure adherence to VA Knowledge Service.",
+          "Perform monthly New User Access Request reviews.",
+          "Perform quarterly Privileged Account reviews.",
+          "Perform quarterly Separated User reviews.",
+          "Perform Inactive Account reviews every 90 calendar days.",
+          "Function as the designated individual for respective service to submit access requests.",
+          "Promptly report changes on a user’s employment status or change of duties to OIT staff to ensure all accounts are acted on appropriately.",
+          "Ensures all access requests comply with background investigation completion, training, and ROB completion prior to request submission."
+        ]
+      }
+    ],
+    "references": [
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, RMF for VA Information Systems VA Information Security Program",
+      "VA Knowledge Service",
+      "Infrastructure Operations SOP, Device Control Access SOP dated February 20, 2019",
+      "Solution Delivery SOP, AD User Account Management SOP dated January 21, 2021"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "roles": 3,
+      "procedures": 4,
+      "references": 5
+    }
+  },
+  "AT": {
+    "familyNumber": 2,
+    "purpose": "» This SOP establishes procedures for the implementation of Awareness and Training Security controls at VA PARS in accordance with Federal Law, VA policy, and the Office of Information Security (OIS) requirements.",
+    "scope": "» This SOP outlines procedures that apply to Information System Owners, ISSO, Product Owner, Talent Management System (TMS) Administrators, and Developers.",
+    "policy": "Initial and annual information security awareness training is mandatory for all individuals who have been granted access to VA-owned information system resources. Supervisors and CORs will ensure that employees and contractors within their area of responsibility (AOR) complete all applicable security role-based training (RBT) within 30 days of occupying a position with security RBT requirements. All VA PARS team members will follow the procedures outlined in this document.",
+    "roles": [
+      {
+        "name": "Information System Owner and Product Owner",
+        "responsibilities": [
+          "Ensure the SOPs set forth in this document are followed by the individuals under their responsibility."
+        ]
+      },
+      {
+        "name": "ISSO",
+        "responsibilities": [
+          "Provide security awareness training at new employee orientation (NEO).",
+          "Monitor compliance with the security awareness and training requirements for each system user.",
+          "Coordinate, monitor, and conduct periodic reviews to ensure compliance with the VA National or Contractor ROB requirement for users of VA information systems and VA information.",
+          "Serve as the primary point of contact (POC) for security awareness and training within their AOR for this requirement for VA staff and partners who work remotely or are considered tenants of their closest VA facility resides with the employee/partner’s parent organization.",
+          "Notify the IT Operations and Services (ITOPS) when users are non-compliant with security training requirements so their computer accounts can be disabled in accordance with VA policy. » Notify TMS domain administrator(s) when training cannot be verified by the ISSO by comparing the AD report to the TMS daily reports.",
+          "Complete quarterly audits to ensure that users with special privileges and/or roles have the appropriate security RBT."
+        ]
+      },
+      {
+        "name": "Product Owner",
+        "responsibilities": [
+          "Assure all VA PARS development team members are enrolled in TMS and their TMS accounts remain properly configured to facilitate accurate reporting. This includes, but is not limited to, ensuring all user TMS accounts are: Active Assigned to the correct TMS domain Using the assigned “va.gov” government employee email address",
+          "Work with services and users to update and correct any TMS account deficiencies as needed.",
+          "Immediately merge duplicated accounts into a single TMS account for the user."
+        ]
+      },
+      {
+        "name": "Managers and supervisors will:",
+        "responsibilities": [
+          "Assure all users within their AOR remain in compliance with all information security and RBT, as appropriate.",
+          "Ensure that the TMS records of their employees are assigned to the correct supervisor."
+        ]
+      },
+      {
+        "name": "All VA PARS users with access to VA-owned information system resources will:",
+        "responsibilities": [
+          "Complete Privacy and Information Security Awareness Training prior to receiving access to VA-owned information system resources, and at least annually thereafter. In addition, the VA Privacy and Health Insurance Portability and Accountability Act (HIPAA) training, as well as any applicable security RBT, will be completed as required by VA Knowledge Service.",
+          "Log into their TMS account every 30 calendar days at a minimum to ensure that the account remains active.",
+          "Use the assigned va.gov government employee email address as the primary contact email and assure the correct address is listed. If the TMS account is inactive, or the user’s supervisor name is incorrect, the TMS domain administrator will be alerted."
+        ]
+      },
+      {
+        "name": "Human Resources",
+        "responsibilities": [
+          "Correct any errors in the HR Smart database that are causing errors in the TMS database."
+        ]
+      },
+      {
+        "name": "Initial Security Awareness Training:",
+        "responsibilities": [
+          "NEO: This training helps employees, contractors, and other users of VA computer systems understand their responsibility to protect sensitive information and information systems.",
+          "Prior to being granted system access, all users will either attend the ISSO-led training during NEO or complete VA Privacy and Information Security Awareness Training with ROB in TMS.",
+          "Users who have completed FISMA-compliant training within the previous 365 days, either with VA or another Federal Agency, are the only exception to this requirement.",
+          "Employees of other Federal agencies are required to sign the VA ROB prior to being provided access to VA’s information systems or VA sensitive information. Table 1 – Security Awareness and Training Courses Target Audience Course Name TMS ID Contractors, FTEE VA Privacy and Information Security Awareness and Rules of Behavior Training VA 10176 ISSO-led security training that occurs outside of NEO VA Privacy and Information Security Awareness and Rules of Behavior – Print (PDF) VA 31167 Contractors, FTEE VA Privacy and HIPAA Training VA 10203 Software Developers Information Security and Privacy RBT for System Administrators VA 1016925"
+        ]
+      }
+    ],
+    "references": [
+      "NIST Special Publication (SP) 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "NIST SP 800-53A, Revision 4, Assessing Security and Privacy Controls in Federal Information Systems and Organizations",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information Systems VA Information Security Program",
+      "VA Knowledge Service, Security Controls Explorer",
+      "Enterprise Security Operations (ESO) SOP AT Awareness and Training V6.1",
+      "MEMO, VIEWS 00236140 Asst Secretary OIT J. Gferer 9/17/19, Disabling Network Accounts for Non-Compliance of Mandatory VA Privacy and Information Security Awareness and Rules of Behavior Training (Updated)",
+      "MEMO VAIQ 7699332 Asst Secretary OIT L. Council 05182016 Information Security and Privacy Awareness Training Requirement"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "AU": {
+    "familyNumber": 3,
+    "purpose": "This SOP has been created to support and facilitate the implementation of the Auditing and Accountability Policy and Applicable security controls. The procedures outlined in this document are consistent with VA Directives and VA Policies, VA OIT Knowledge Services, and the VA Handbook 6500.2. The purpose of this SOP is to support and supplement VA PARS auditing capabilities and processes. This document is intended to complement existing VA Directives and Policies.",
+    "scope": "This SOP is applicable to all VA PARS staff involved in development, execution, and reporting procedures for incident response.",
+    "policy": "» Audit trails can assist in detecting security violations, system performance problems, and application flaws. Audit trails may also help in identifying problems that are not related to security incidents or intrusions. » VA PARS is responsible for regularly reviewing and analyzing audit records for indications of inappropriate or unusual activity and investigating suspicious activity. Any security-related incidents will be immediately reported to the appropriate ISSO and to the VA Cyber Security Operations Center (CSOC). Logs should be maintained for a minimum of one year and should be reviewed/monitored by the Product Owner, or designee, daily. The appropriate ISSO will audit this process to ensure the reviewed events are corrected. » All staff with audit roles and responsibilities will comply with the procedures outlined within this SOP. » VA PARS Product Owner will establish and review adequate audit trails to assist in detecting security violations, system performance problems, and application flaws. In addition, additional audit trails should be established to identify problems that are not related to security violations or intrusions such as fluctuations of system resources. » All audit records will be properly documented and maintained as required by National Archive Records Administration (NARA) retention periods and/or HIPAA legislation. » To ensure VA PARS meets the retainability period, periodic backups will be determined and conducted. All system backup audit records will be logically separated from the system or system component that is being audited.",
+    "roles": [
+      {
+        "name": "ISO or Designee",
+        "responsibilities": [
+          "Monitor and investigate security violations for activities involving access and modification of files within the information systems.",
+          "Determine and enable audit logs at the application level and document what audit events will be monitored for VA PARS.",
+          "Determine and implement audit log events.",
+          "Determine privilege users with authorized access to management of audit functionality at the application level."
+        ]
+      },
+      {
+        "name": "ISSO",
+        "responsibilities": [
+          "Coordinate all audit logs to identify security violations and/or incidents.",
+          "Ensure the System Owner and IT personnel implement audit procedures in accordance with VA guidelines and policies.",
+          "Coordinate with ISO, Product Owner, CSOC, and Privacy Officer (PO) to ensure corrective steps are taken to minimize and resolve security events."
+        ]
+      },
+      {
+        "name": "ITOPS/Enterprise Cloud Solutions Office (ECSO)",
+        "responsibilities": [
+          "Monitors information system audit logs and ensure corrective steps are taken to minimize and resolve security events.",
+          "Report any suspicious security event to the ISO and ISSO."
+        ]
+      },
+      {
+        "name": "Privacy Officer",
+        "responsibilities": [
+          "Review and monitor all audit logs to identify privacy violations and/or incidents."
+        ]
+      }
+    ],
+    "references": [
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, RMF for VA Information Systems VA Information Security Program",
+      "Committee on National Security Systems (CNSS) -1253, 27 March 2014, Security Categorization and Control Selection for National Security Systems",
+      "VA Information Security: Knowledge Service",
+      "ESO SOP – Elevated Privilege (EP) Users Audit v.3.1, September 23, 2020"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 7
+    }
+  },
+  "CA": {
+    "familyNumber": 4,
+    "purpose": "This SOP establishes procedures for the implementation of Security Assessment and Authorization (CA) security controls at VA PARS in accordance with federal law, VA policy, and OIS requirements.",
+    "scope": "This SOP outlines procedures that apply to those involved in the implementation of the CA security controls for the VA PARS. This includes the ISO, ISSO, System Steward(s), PO, and all information system users.",
+    "policy": "The system-specific procedures outlined in this SOP are intended to ensure compliance with: » VA Directive 6500 » VA Knowledge Service » VA Handbook 6500.3 » NIST Special Publication 800-53, Revision 4 » NIST Special Publication 800-37",
+    "roles": [
+      {
+        "name": "ISO",
+        "responsibilities": [
+          "Ensure that the information system complies with the NIST Special Publication 800-53.",
+          "Assigns a System Steward to facilitate implementation of the system’s CA security controls.",
+          "Cooperate with independent assessors or assessment teams when they conduct security control assessments of VA PARS.",
+          "Submit the system for (re)authorization no less than 70 days prior to the expiration of its current Authorization to Operate (ATO), or when the system undergoes significant changes.",
+          "When an interconnection is to be established, initiate, and complete the Memorandum of Understanding (MOU) or Interconnection Security Agreement (ISA) intake form: Work with the ISSO to evaluate security requirements for proposed and ongoing interconnections. Work with third-party companies to set up network interconnections.",
+          "Verify that devices are authorized to be connected to the VA network via the information system."
+        ]
+      },
+      {
+        "name": "Information System Security Officer (ISSO)",
+        "responsibilities": [
+          "Monitor the security controls in the information system on an ongoing basis for effectiveness and adequacy of system security controls using the VA Governance, Risk, and Compliance (GRC) tool.",
+          "Cooperate with independent assessors or assessment teams when they conduct security control assessments of VA PARS.",
+          "Ensure that interconnections are properly authorized and documented using MOU/ISAs by: Verifying the security content in the MOU/ISA is accurate and reporting deficiencies to the document stakeholders. Uploading draft and final MOU/ISA documents to the MOU/ISA document site portal Confirming that completed MOU/ISAs are uploaded to applicable security controls in the GRC tool. Aiding and guiding stakeholders through the system interconnection approval process Providing cybersecurity subject matter expertise for MOU/ISA content • Reviewing local MOU/ISAs annually to ensure security controls are still in place.",
+          "Maintain records/documents to show that the information system: Undergoes assessment of designated security controls in the information system Analyzes for impact to documents and reports changes to, or deficiencies in, the operation of the security controls. Documents weaknesses in a Plan of Action & Milestones (POA&M) using the designated VA-approved GRC tool."
+        ]
+      },
+      {
+        "name": "System Steward(s)",
+        "responsibilities": [
+          "Document and test security controls",
+          "Work with the ISO and ISSO to make updates to the system security documentation in the VA GRC tool."
+        ]
+      },
+      {
+        "name": "Privacy Officer (PO)",
+        "responsibilities": [
+          "Ensure that interconnections are properly authorized and documented using MOU/ISAs Manage the risks and business impacts of privacy laws and policies. Assist the cybersecurity team with ensuring privacy requirements are included for all interconnections."
+        ]
+      },
+      {
+        "name": "Other information system stakeholders’ personnel",
+        "responsibilities": [
+          "Ensure that system security controls are accurately assessed by working with other system stakeholders to assess and provide information that facilitates the assessment of the system’s security controls."
+        ]
+      }
+    ],
+    "references": [
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "NIST 800-53A, Revision 4, Assessing Security and Privacy Controls in Federal Information Systems and Organizations",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information Systems VA Information Security Program",
+      "VA Knowledge Service",
+      "ESO SOP Continuous Monitoring, Version 1.2, October 2019",
+      "ESO SOP Privacy and Security Control Reviews, Version 4.2, December 2018",
+      "ESO SOP Privacy and Security Control Reviews, Version 4.2 Addendum/Errata Notice, March 2019",
+      "ESO SOP Records Management, Version 3.2, December 2018",
+      "ESO SOP Security Assessment and Authorization (A&A), Version 4.1, October 2019"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "CM": {
+    "familyNumber": 5,
+    "purpose": "The purpose of this SOP is to establish the configuration management procedures required by the configuration management security control for the VA PARS computer system(s) as outlined in VA Directive 6500. The intent of this document is to facilitate the implementation of VA PARS procedures for NIST controls. All assigned employees are required to comply with this SOP as required by VA Directive 6500. OIT reviews and updates the current configuration management policies and applicable procedures every 5 years. VA Directive 6500 contains the System Configuration Management Policy for VA OIT. VA OIT outlined VA’s system security controls based on the current version of NIST SP 800-53 and Committee on National Security Systems (CNSS) Instruction No. 1253, which are required for the effective implementation of the configuration management family. The controls and procedures in this document are consistent with applicable laws: executive orders, policies, regulations, standards, and guidance. They will be periodically reviewed and, when necessary, updated.",
+    "scope": "This SOP governs information system configuration management activities. The procedures outlined in this SOP apply to all VA PARS personnel responsible for implementing this control family.",
+    "policy": "VA PARS team will implement the configuration management SOP section of the POM to facilitate the implementation of the configuration management policy and associated configuration management controls. The ISO or designee will develop and disseminate procedures to facilitate the implementation of the configuration management policy and associated controls. These procedures include purpose, scope, roles, responsibilities, management commitment, coordination among organizational entities, and compliance. VA PARS staff will collaborate, participate, and recognize the shared, related, and interdependent responsibility to provide effective and efficient information security to the information system. VA PARS team will follow the procedures outlined in this document. The designated authority will review annually, and update as needed, the configuration management procedures. VA PARS adheres to system development (SD) configuration management requirements at the enterprise level along with those of the VA PARS SOP to facilitate the implementation of the configuration management policy and associated controls. This SOP is developed to facilitate the implementation and management of CM controls at the information system level. The VA PARS SOP is disseminated to all personnel responsible for configuration management responsibilities.",
+    "roles": [
+      {
+        "name": "ISO",
+        "responsibilities": [
+          "Fulfill the role of ISO within the GRC tool and is referred to as ISO within this SOP.",
+          "Ensure the procedures set forth in this document are followed by the individuals under their responsibility.",
+          "Review the SOP annually and update as necessary. Notify VA PARS staff of all changes and updates to this SOP using the OIT CRR ACOE Technical Solutions All Staff (alias: TSAll@va.gov) Distribution Group (DG).",
+          "Is responsible for fulfilling their role as ISO within the GRC tool.",
+          "Is responsible for maintaining a complete and accurate inventory of IT assets to include: Software and licensing Web applications Databases",
+          "Develop a configuration management plan (CMP) for the information system that establishes a process for managing the configuration of the configuration items. The plan establishes a process for identifying configuration items throughout the SD lifecycle.",
+          "Play integral role in the assessment and security impact analysis of local new or proposed information systems.",
+          "Monitor and respond to unauthorized changes and security incidents.",
+          "Approve and review privileged user access to the information system as well as the logical access to information systems.",
+          "Ensure that all: VA PARS personnel adhere to VA policies, procedures, bulletins, and memorandums relative to NIST Special Publication 800-53 Security Controls and Assessment Procedures for Federal Information Systems and Organizations. Product Owner schedules, records, and documents all changes to an information system or application in accordance with VA Directive 6004, Configuration, Change, and Release Management Programs. Technical Advisor follows VA Enterprise baseline configuration standards and change management procedures."
+        ]
+      },
+      {
+        "name": "Technical Advisor",
+        "responsibilities": [
+          "Under the direction and assignment of the ISO, the Technical Advisor maintains inventory of information system components within their boundary.",
+          "Responsible for maintaining: • Routine validations of assets",
+          "Manages conformance with VA OIT security policies by decommissioning information systems and completing appropriate records.",
+          "Update the inventory of information system components as an integral part of information system updates."
+        ]
+      },
+      {
+        "name": "System Steward",
+        "responsibilities": [
+          "Responsible for fulfilling their role as system steward within the GRC tool.",
+          "Responsibilities include: Assigning user roles to generate an RMF security authorization package. Maintaining system-level information Managing the System’s security categorization Creating POA&M items Documenting control correlation identifier (CCI) compliance and control implementation status Uploading and managing artifacts Initiating workflows and package submission"
+        ]
+      },
+      {
+        "name": "Information Systems Security Officer (ISSO)",
+        "responsibilities": [
+          "Confirm that configuration management and change control procedures are documented for each system in the RMF GRC tool.",
+          "Play an integral role in the assessment and security impact analysis of new and proposed information systems.",
+          "Fulfill their role as ISSO within the GRC tool."
+        ]
+      }
+    ],
+    "references": [
+      "NIST SP 800-53, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "NIST SP 800-128, Guide for Security-Focused Configuration Management of Information Systems",
+      "VA Directive 6004 Configuration, Change, and Release Management Programs",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, RMF for VA Information Systems VA Information Security Program",
+      "VA Handbook 6513, Secure External Connections",
+      "VA Handbook 7002, Logistics Management Procedures",
+      "VA Enterprise baseline configuration standards and change management procedures",
+      "VA Enterprise baseline configurations",
+      "Authorization Requirements Standard Operating Procedures",
+      "Committee on National Security Systems (CNSS) Instruction No. 1253",
+      "FIPS 140-2 – Security Requirements for Cryptographic Modules » FIPS 140-3 – Security Requirements for Cryptographic Modules",
+      "VA Information Security Knowledge Service",
+      "VA CSOC Threat Assessment & Analysis Portal (TAAP)",
+      "VA Forms and Publications",
+      "VA Form 134 – Combination Requisition and Shipping Ticket",
+      "VA Form 0751 – IT Equipment Sanitization Certificate",
+      "VA Form 0887 – VA Government Property Loan",
+      "VA Form 2237 – Request, Turn-In, and Receipt for Property or Services"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "CP": {
+    "familyNumber": 6,
+    "purpose": "The purpose of this SOP is to establish procedures for VA PARS by providing mandatory processes for contingency planning operations.",
+    "scope": "The intent of this document is to detail the procedures for VA PARS implementation of contingency planning controls as defined by NIST. Contingency planning controls are intended to facilitate the continuation of critical services and business practices and allow the organization to return to its daily operations as quickly as possible after an unforeseen event. They also help protect the confidentiality, integrity, and availability of information systems during interruption and restoration of information systems.",
+    "policy": "VA PARS team is required to comply with this Contingency Planning SOP as required by Knowledge Services. This SOP requires staff to collaborate, participate, and recognize the shared, related, and interdependent responsibilities to provide effective and efficient security to information system(s).",
+    "roles": [
+      {
+        "name": "ISO and/or Designee",
+        "responsibilities": [
+          "Distribute the Information System Contingency Plan (ISCP) documents to authorized recipients.",
+          "Conduct contingency plan testing for the application at least annually and after any major change to ISCP procedures.",
+          "Activate contingency operations as needed.",
+          "Communicate with VAEC personnel as needed to facilitate recovery and reconstitution procedures."
+        ]
+      },
+      {
+        "name": "ISSO",
+        "responsibilities": [
+          "Advise VA PARS team in the contingency planning process.",
+          "Coordinate with VA PARS and VAEC to assure contingency planning and testing is conducted at least annually.",
+          "Work with ISO and/or designee to gather test results from services to determine if ISCP procedures are adequate.",
+          "Work with contingency planning officials to implement lessons learned as needed."
+        ]
+      },
+      {
+        "name": "VA PARS Development Team",
+        "responsibilities": [
+          "Support contingency operations/procedures under the direction of the ISO and/or designee."
+        ]
+      }
+    ],
+    "references": [
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, RMF for VA Information System VA Information Security Program",
+      "Knowledge Services, RMF for VA Information Systems – Tier 3: VA Information Security Program"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "IA": {
+    "familyNumber": 7,
+    "purpose": "The purpose of this SOP is to facilitate the implementation of NIST 800-53, Revision 4 Identification and Authentication (IA) controls, VA Handbook 6500, RMF for VA Information Systems – Tier 3: VA Information Security Program, VA Handbook 6500.2.",
+    "scope": "This SOP is applicable to all VA PARS team involved in the development, execution, and reporting procedures for the NIST IA control family. The information contained in this IA SOP is intended to maintain the operating system of VA PARS addressing and managing identification and authentication of users and assets within the VA PARS application. It will also help protect the confidentiality, integrity, and availability of VA PARS for continuance of essential missions and business functions. It also helps limit damage and reduce recovery time and costs. All VA PARS team members are required to comply with this IA SOP per the VA Handbook 6500.",
+    "policy": "A robust IA policy decreases the risk of unauthorized access to information systems. The VA PARS team will collaborate, participate, and recognize the shared, related, and interdependent responsibility to provide effective and efficient information security to the VA PARS application. All VA PARS team members and contractors will follow the procedures outlined in this document.",
+    "roles": [
+      {
+        "name": "ISO and/or Designee",
+        "responsibilities": [
+          "ISO is ultimately responsible for the full management and operation of VA PARS.",
+          "ISO may delegate the following responsibilities noted below: Ensuring that the SOP set forth in this document are followed by the individuals under his/her responsibility. Ensuring that security violations involving IA occurring within their assigned area of management control are reported to the appropriate ISSO. Ensuring that all employees, contractors, and other individuals within their assigned area of management control who develop, operate, administer, maintain, or use VA PARS understand they are responsible for reporting actual or suspected security incidents to their immediate supervisor or ISSO."
+        ]
+      },
+      {
+        "name": "ISSO",
+        "responsibilities": [
+          "Ensure that the IA control is being satisfied by the security measures that were implemented.",
+          "Work with OIT technical staff to determine the nature and scope of security incidents.",
+          "Track, report, and close out security violations and incidents in PSETS."
+        ]
+      }
+    ],
+    "references": [
+      "Office of Management and Budget (OMB) Memorandum M-04-04, E-Authentication Guidance for Federal Agencies",
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "NIST SP 800-63, Electronic Authentication Guideline",
+      "NIST SP 800-73, Interfaces for Personal Identity Verification",
+      "NIST SP 800-76, Biometric Specification for Personal Identity Verification",
+      "NIST SP 800-78, Cryptographic Algorithms and Key Sizes for Personal Identity Verification",
+      "FIPS 140-3 (or its successor)",
+      "FIPS 201, PIV of Federal Employees and Contractors",
+      "Homeland Security Presidential Directive (HSPD) 12, Policy for a Common Identification Standard for Federal Employees and Contractors",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, RMF VA Information Systems VA Information Security Program",
+      "VA Handbook 6510 VA Identity and Access Management",
+      "VA Handbook 0735, Homeland Security Presidential Directive 12 (HSPD-12) Program",
+      "VA Knowledge Service (Knowledge Service Home Page)",
+      "VA Naming Convention Knowledge Base",
+      "Memorandum 19-17: Enabling Mission Delivery through Improved Identity, Credential, and Access Management (ICAM) » AD User Account Management SOP"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "IR": {
+    "familyNumber": 8,
+    "purpose": "» To facilitate the implementation of the NIST SP 800-53 Security and Privacy Controls for Federal Information Systems and Organizations, NIST 800-61 Computer Security Incident Handling Guide, RMF for VA Information Systems – Tier 3: VA Information Security Program, VA Handbook 6500.2 Management of Breaches Involving Sensitive Personal Information, and ESO Incident Response Reporting, Training, and Testing SOP. » VA PARS system security controls are based on the current version of NIST SP 800-53 and the Committee on National Security Systems (CNSS) Instruction No. 1253, which are required for the effective implementation of the Incident Response family.",
+    "scope": "This SOP applies to VA PARS ISSO, Privacy Officer, ISO, Product Owner, and VA PARS team members.",
+    "policy": "",
+    "roles": [
+      {
+        "name": "ISO and/or designee",
+        "responsibilities": [
+          "Incident Preparation: Maintain current VA PARS incident response contact information. Make training available as appropriate and necessary to the VA PARS incident response personnel. Ensure that all users of VA information and information systems under their responsibility take annual privacy training. Work closely with the ISSO to maintain continuity of service. Ensure that all users of VA information and information systems under their responsibility take ownership/responsibility for the data at their disposal.",
+          "Incident Prevention: Adhere to VA configuration standards to ensure application setups are appropriately configurated and maintained. Ensure the appropriate user awareness and training programs on privacy procedures are available. Ensure that users are aware of the reporting procedures and the policies in place to protect information systems, employees, and property. Maintain a strong working relationship with the ISSO and Privacy Officer. Ensure systems and subsystems affected by incidents are isolated as quickly as possible and, if necessary, are restored and/or rebuilt.",
+          "Incident Detection: Implement enterprise tools in a timely fashion. Provide consistent monitoring and automated alert implementation. Maintain a strong working relationship with staff to encourage reporting of incidents/suspected incidents.",
+          "Incident Analysis Maintain pertinent information including audit and event logs as well as user account information when appropriate.",
+          "Incident Documentation: Provide updates to open incidents as directed. Provide input as required in any documentation requested from top management both inside and outside the VA PARS. Safeguard data and sensitive information related to the incident. Ensure that access to incident data is properly restricted.",
+          "Containment Strategy Coordinate and advise in the execution of the containment strategy and efforts at the application level. Make decisions about containment actions. Coordinate response actions until incidents are resolved. Report to senior VA officials on the status of incidents. Work with the OIT and VAEC staff to assure containment actions are performed in a timely and efficient manner. Safeguard the integrity of involved software as appropriate.",
+          "Evidence Gathering and Management Preserve software as appropriate and requested. Preserve audit and event logs as appropriate.",
+          "Corrective/Mitigation Action Balance mission needs with recommended risk mitigation. Own the restoration plan. Coordinate with Network ISSOs, Privacy Officers, and staff to implement eradication and remediation actions. Implement recommendations as appropriate. Maintain a record of costs associated with repair, restoration, business disruption, and labor.",
+          "Lessons Learned Participate with the VA PARS incident response staff in an incident postmortem review of all documentation surrounding the incident/suspected incident. Implement “best practices” as appropriate based on the review."
+        ]
+      },
+      {
+        "name": "Appropriate Information System Security Officer (ISSO)",
+        "responsibilities": [
+          "Incident Preparation Obtain and maintain PSETS user account. Be aware of the security laws, regulations, and policies that apply to the organization. Review incident response policy and procedures annually. Communicate to individuals within the organization to report suspected incidents as soon as identified or discovered to the ISSO(s). Ensure the Incident Response Plan (IRP) test is conducted annually.",
+          "Incident Prevention Advise users on proper security protocols to prevent incidents. Ensure training compliance within 30 days of assuming an IR role or responsibility and annually thereafter. Follow AT Awareness and Training SOP.",
+          "Incident Detection Communicate protective measures received from VA-Cyber Security Operations Center (VACSOC) when an incident or vulnerability is discovered. Ensure that incidents are properly reported, responses are coordinated, and incident updates are provided as required. Coordinate with the PO to determine if a detected or reported security incident is also a privacy incident.",
+          "Incident Analysis Enter all reported incidents into the PSETS within one (1) hour of receiving or identifying an incident. Complete a risk evaluation within PSETS using the “Information at Risk” tab at the time of reporting the incident and update PSETS information accordingly.",
+          "Incident Documentation For events, not in a “closed” status, review on a regular basis, and document updates within PSETS when new or relevant information has been obtained. Track the progress of response activity via a PSETS event if the event is determined to be a breach and perform all necessary documentation of progress. Ensure redacted copies of pertinent external communications (i.e., email, letters, web page, etc.) have been attached to the PSETS event. PSET tickets were remediated when remediation instructions were received from VA- CSOC.",
+          "Incident Notification Notify VA PARS team and support staff of the incident. Keep VA PARS team and support staff apprised of any changes or updates regarding the incident. Containment Strategy Participate in initiating containment actions and suggest alternate containment actions, as necessary.",
+          "Evidence Gathering and Management Execute direction provided by the Data Breach Response Service, VA-CSOC, law enforcement, or the Office of the Inspector General (OIG). Consult with law enforcement or the OIG as necessary. Log all comments and details of their investigation into PSETS ticket.",
+          "Lessons Learned Incorporate lessons learned during ongoing incident handling activities into the specific IR handling procedures in the VA PARS IRP and VA PARS IR SOP."
+        ]
+      },
+      {
+        "name": "Privacy Officer (PO)",
+        "responsibilities": [
+          "Incident Preparation Take appropriate privacy and security training. Obtain and maintain a PSETS account and develop familiarity with the system. Review VA Handbook 6502.1, Privacy Event Tracking. Review PSETS Basic User’s Handbook. Maintain awareness of the privacy laws, regulations, and policies that affect their organizations. Ensure that individuals within their organizations know who their POs are. Acquire template of Incident Notification/Credit Monitoring letter. Establish a working relationship with the ISSO(s) for their organizations. Ensure that VA PARS team members have appropriate incident response mechanisms, such as phone numbers, email addresses, and tools available to report suspected privacy incidents to the PO. Ensure an After-Action Report (AAR) process for privacy incidents is in place to look at root causes and future prevention mechanisms.",
+          "Incident Prevention Implement Departmental and appropriate Administration privacy policies and procedures. Establish an internal privacy audit or compliance monitoring and audit program. Report that individuals in their organizations complete the appropriate annual Privacy training(s). Ensure that privacy issues and concerns are communicated to and coordinated with appropriate parties. Participate in the review of Privacy Threshold Assessments (PTA) and Privacy Impact Assessments (PIA) for systems within the purview of their organizations. Understand what constitutes a Privacy Act System of Records (SOR) and ensure that all PII that is retrieved by individuals’ names or other unique identifiers are maintained in an official SOR published in the Federal Register. Promote activities to foster privacy awareness (e.g., Privacy Day or Information Protection Awareness Week).",
+          "Incident Detection Receive complaints from Veterans or anyone within their organization who believes an incident has occurred. Enter all complaints received into the system allotted e.g., PSETS, the reporting of incidents within one (1) hour of discovery. Follow guidance provided by the VA Privacy Service to record all incidents in PSETS. Monitor all incidents and complaints entered in PSETS. Provide updates to PSETS, as appropriate.",
+          "Incident Documentation For events not in a “closed” status, review on a regular basis, and document updates within PSETS when new or relevant information has been obtained. Track the progress of response activity via a PSETS event, if the event is determined to be a breach, and perform all necessary documentation of progress. Ensure redacted copies of pertinent external communications (i.e., email, letters, web page, etc.) have been attached to the PSETS event. Ensure redacted copies of notification and/or credit protection letters are attached to PSETS events as required.",
+          "Incident Notification Notify VA PARS team members and support staff of the incident. Keep VA PARS team members and support staff apprised of any changes or updates regarding the incident. Prepare Incident Notification/Credit Monitoring Letters for signature. Obtain Promo Codes for credit monitoring letters when applicable.",
+          "Containment Strategy Participate in initiating containment actions when there is a privacy component. Suggest containment actions, as necessary.",
+          "Restoration Ensure timely closure of incidents and complaints.",
+          "Evidence Gathering and Management Execute direction provided by the Data Breach Response Service, VA-CSOC, law enforcement, and the OIG. Begin fact-finding investigation and log all comments and details of the investigation into PSETS or the subsequent system designated for the reporting of privacy complaints and incidents once the initial complaint or incident is logged into PSETS. Consult with law enforcement, OIG, or other investigatory agencies as necessary.",
+          "Lessons Learned Log resolution of incident or complaint"
+        ]
+      }
+    ],
+    "references": [
+      "45 C.F.R. Part 164, 164.400-.414, Notification in the Case of Breach of Unsecured Protected Health Information.",
+      "NIST SP 800-61 Rev 2 – Computer Security Incident Handling Guide",
+      "NIST SP 800-53 Rev 4 – Security and Privacy Controls for Federal Information Systems and Organizations",
+      "VA Directive 6311 VA E-Discovery",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information System VA Information Security Program",
+      "VA Handbook 6500.2, Management of Security and Privacy Incidents",
+      "https://vaww.vashare.oit.va.gov/sites/ois/KnowledgeService/Pages/eMASS.aspx",
+      "VA CSOC Security-Privacy Events System User’s Manual",
+      "Incident Response – Standard Operating Procedure – Enterprise Security Operations (ESO) End User Operations (EUO) | IT ITOPS",
+      "VA ESO Records Management",
+      "VA-CSOC Threat Assessment & Analysis Portal (TAPP)",
+      "National Cybersecurity and Communications Integration Center (NCCIC)",
+      "US Department of Veterans Affairs Identity Theft",
+      "Incident Response Plan Templates",
+      "Privacy and Security Event Tracking System (The link will only work if you have access to PSETS)"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "roles": 3,
+      "procedures": 4,
+      "references": 6
+    }
+  },
+  "MA": {
+    "familyNumber": 9,
+    "purpose": "This SOP is developed to facilitate the implementation of maintenance procedures as required by the security control family. This SOP will be reviewed at least once every 365 calendar days and updated every 5 years or when changes occur in the procedures or regulations, whichever is the earliest. This SOP will be disseminated to all VA PARS personnel responsible for implementing the requirements and procedures described in this SOP.",
+    "scope": "",
+    "policy": "The intent of this document is to facilitate the implementation of VA PARS maintenance procedures for NIST. All VA PARS team members are required to comply with this MA SOP as required by VA Handbook 6500. OIT reviews and updates the System Maintenance policy every 5 years per VA Directive and Handbook 6330. VA PARS develops, documents, and disseminates to defined personnel or roles and reviews and updates the current SOP. VA PARS outlines system security controls based on the current version of NIST SP 800-53 that are required for the effective implementation of the System Maintenance family. The System Maintenance controls and procedures in this SOP are consistent with applicable laws: Executive orders, policies, regulations, standards, and guidance, and will be periodically reviewed, and, when necessary, updated. This SOP requires VA PARS team members to collaborate, participate, and recognize the shared, related, and interdependent responsibility to provide effective and efficient information security to the information system. All VA PARS team members will follow the procedures outlined in this document. The ISO and/or designee will review and update the system maintenance plan when changes are made or as needed.",
+    "roles": [
+      {
+        "name": "Information System Owner (ISO) and/or Designee",
+        "responsibilities": [
+          "Ensure the procedures set forth in this document are followed by the individuals under their responsibility.",
+          "Reviews SOP annually and updates as necessary."
+        ]
+      },
+      {
+        "name": "Information System Security Officers (ISSO)",
+        "responsibilities": [
+          "Confirm local ITOPS maintenance staff schedules, records and documents all changes to an information system or application in accordance with VA Directive 6004, Configuration, Change, and Release Management Programs.",
+          "Ensures ITOPS employs automated mechanisms (e.g., ServiceNow) to schedule, conduct, and document maintenance and repairs as required, producing up-to-date, accurate, complete, and available records of all maintenance and repair actions, needed, in process, and completed.",
+          "Verify that ITOPS staff inspects all maintenance tools carried into a facility by maintenance personnel for obvious improper modifications; and that the OIT staff documents this inspection has taken place by annotating the completion of this action in the visitor log. Maintenance tools include diagnostic and test equipment used to conduct maintenance on an information system.",
+          "Review and confirm for non-local maintenance that remote access controls are implemented for contractor and/or third-party service providers conducting remote maintenance via VA approved Remote Access Portal (RAP) solutions, as documented on the Business Associate Agreement (BAA), Service Level Agreement (SLA), Interconnection Security Agreement (ISA), Memorandum of Understanding (MOU), Memorandum of Agreement (MOA), or NonDisclosure Agreement (NDA) in place as appropriate."
+        ]
+      },
+      {
+        "name": "VA PARS Development Team",
+        "responsibilities": [
+          "VA PARS developers will perform source code maintenance in accordance with CMP."
+        ]
+      }
+    ],
+    "references": [
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information Systems VA Information Security Program",
+      "VA Knowledge Service",
+      "ESO SOP 0019 MA Maintenance v1.1"
+    ],
+    "sections": {
+      "purpose": 1,
+      "policy": 2,
+      "roles": 3,
+      "procedures": 4,
+      "references": 5
+    }
+  },
+  "MP": {
+    "familyNumber": 10,
+    "purpose": "To facilitate the implementation of the media protection procedures and associated media protection controls in NIST 800-53, NIST 800-88, VA Handbook 6500, OIT/OIS SOP Media Sanitization and Disposition, and ESO Data and Media Protection SOP.",
+    "scope": "This SOP applies to VA PARS team members with media protection and sanitization responsibilities.",
+    "policy": "",
+    "roles": [
+      {
+        "name": "Information System Owner (ISO) and/or Designee",
+        "responsibilities": [
+          "Ensures that maintenance or contractual agreements with VAEC are in place and are sufficient in protecting the confidentiality of the system media.",
+          "Ensures a secured storage space is designated for media subjected to Litigation Hold and media for disposition.",
+          "Ensures media identified for Litigation Hold is not destroyed without written approval by the appropriate officials (i.e., Records Manager, HR, Attorney).",
+          "Reports incidents involving compromise of media to the ISSO."
+        ]
+      },
+      {
+        "name": "IT Specialist",
+        "responsibilities": [
+          "Ensures media disposition occurs within 90 days of removal from a device, as defined by ITOPS.",
+          "Ensures media subjected to a Litigation Hold and media for disposition are kept in the designated secured storage space.",
+          "Ensures media subjected to a Litigation Hold is tracked on a local spreadsheet.",
+          "Ensures approved sanitization methods were used for unencrypted devices.",
+          "Completes, signs, and maintains all VA Form 0751.",
+          "Ensures all media is properly marked in accordance with section 4.3 and pre-sanitized in accordance with section 4.7.",
+          "Performs media disposition processes as defined in the national contract or in the OIT OIS Media Sanitization and Disposition SOP.",
+          "Reports incidents involving compromise logical media to the ISSO."
+        ]
+      },
+      {
+        "name": "Information System Security Officer (ISSO)",
+        "responsibilities": [
+          "Verifies the site sanitization process and disposition program complies with VA policy annually and maintains the audit documentation.",
+          "Ensures a POA&M is created in the GRC tool for non-compliance (i.e., media held over 90 days, media not in a secured area, etc.).",
+          "Reviews VA Form 0751 verifies appropriate sanitization methods were used for unencrypted devices and signs upon completion.",
+          "Reports incidents involving compromise or loss of media in accordance with the ESO Incident Response Training and Testing SOP.",
+          "Ensures security controls are addressed for VASI throughout the system lifecycle to include media sanitization and disposition in accordance with the ESO Acquisitions and Contract Information Security Review SOP."
+        ]
+      }
+    ],
+    "references": [],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "roles": 3,
+      "procedures": 4
+    }
+  },
+  "PE": {
+    "familyNumber": 11,
+    "purpose": "The purpose of this SOP is to establish procedures for providing mandatory safeguards processes for VA PARS Physical and Environmental (PE) Protection controls practices for all VA PARS team members who are involved with the management, operation, environmental, and protection of the VA PARS information systems.",
+    "scope": "The intent of this document is to facilitate the implementation of VA PARS implementation procedures for NIST PE security controls. The information in this SOP is intended for the protection of the physical and environmental areas of the VA PARS system. It will also help protect the confidentiality, integrity, availability of information created, processed, stored, aggregated, and transmitted by the area’s processes. All VA PARS team members are required to comply with this PE SOP as required by VA Handbook 6500 and VA Directive 0730/4. This SOP requires ISO and VA PARS team members to collaborate, participate, and recognize the shared, related, and interdependent responsibility to provide effective and efficient physical and environmental protection services to the VA PARS system. All VA PARS team members will follow the procedures outlined in this document.",
+    "policy": "",
+    "roles": [
+      {
+        "name": "Information System Owner and/or Designee will:",
+        "responsibilities": [
+          "Provide necessary support to ISO and VA PARS team members in complying with VA Handbook 6500, Physical and Environmental Protection Policy and Procedures. • Document the implementation details and upload evidence into cybersecurity GRC tool such as eMASS."
+        ]
+      },
+      {
+        "name": "Information System Security Officer (ISSO) will:",
+        "responsibilities": [
+          "Monitor compliance to the PE Control Standards.",
+          "Review eMASS, for control completeness, evidence uploaded and POA&Ms."
+        ]
+      }
+    ],
+    "references": [],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "roles": 3,
+      "procedures": 4
+    }
+  },
+  "PL": {
+    "familyNumber": 12,
+    "purpose": "This SOP establishes procedures for the implementation of Planning (PL) security controls for VA PARS in accordance with Federal Law, Department of Veterans Affairs (VA) policy, and the Office of Information Security (OIS) requirements.",
+    "scope": "This SOP outlines procedures that apply to those involved in the implementation of the PL security controls for the VA PARS. This includes the ISO, ISSO, and system steward(s).",
+    "policy": "The system-specific procedures outlined in this SOP are intended to ensure compliance with: VA Directive 6500 VA Knowledge Service NIST Special Publication 800-53, Revision 4 NIST Special Publication 800-37",
+    "roles": [
+      {
+        "name": "Information System Owner (ISO)",
+        "responsibilities": [
+          "Participates in the creation, review, and update of the SSP using eMASS",
+          "Disseminates the SSP to the ISSO, PO, and Accountability Officer (AO), upon creation or change.",
+          "Initiates a new eMASS workflow when the SSP is created or changed, and ensures that appropriate approval is obtained.",
+          "Ensures that each new or continued user of the information system has signed (or re- signed) acknowledgement of the VA National Rules of Behavior. 12.4.2 Information System Security Officer (ISSO)",
+          "Participates in the creation, review, and update of the SSP using eMASS"
+        ]
+      },
+      {
+        "name": "Each VA PARS team member",
+        "responsibilities": [
+          "Reads, understands, and agrees to abide by the rules of behavior.",
+          "Upon changes to the rules of behavior or on an annual basis, reads, understands, and agrees to abide by the rules of behavior."
+        ]
+      }
+    ],
+    "references": [
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "NIST 800-53A, Revision 4, Assessing Security and Privacy Controls in Federal Information Systems and Organizations",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information Systems VA Information Security Program",
+      "VA Knowledge Service",
+      "Enterprise Security Operations Standard Operating Procedure Continuous Monitoring, Version 1.2, October 2019",
+      "Enterprise Security Operations Standard Operating Procedure Privacy and Security Control Reviews, Version 4.2, December 2018",
+      "Enterprise Security Operations Standard Operating Procedure Privacy and Security Control Reviews, Version 4.2 Addendum/Errata Notice, March 2019",
+      "Enterprise Security Operations Standard Operating Procedure Records Management, Version 3.2, December 2018"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "PS": {
+    "familyNumber": 13,
+    "purpose": "This SOP has been created to support and facilitate Personnel Security (PS) controls at VA PARS. The procedures outlined in this document are consistent with VA Directives and VA Policies, VA Knowledge Service, and VA Handbook 6500.2. The purpose of this SOP is to establish procedures for providing mandatory safeguard processes for the PS controls for VA PARS team members involved with the management, operation, and personnel security of the VA PARS information system.",
+    "scope": "This SOP is applicable to VA PARS COR who is involved in the onboarding and offboarding process for VA PARS team members.",
+    "policy": "The intent of this document is to facilitate the implementation of PS controls as outlined by the NIST. VA PARS is required to follow published VA policies and regulations which establish criteria and procedures for making suitability determinations and taking suitability actions involving applicants for and appointees to covered positions. Suitability determinations are based on a person’s character or conduct that may have an impact on the integrity or efficiency of the service. Determining suitability for Federal employment will be consistent with 5 Part Code of Federal Regulations (CFR) 731. Determining fitness for contractor employees will be based on criteria equivalent to that used for Federal employees. Determinations made under this category are distinct from determinations of eligibility for assignment to, or retention in, sensitive national security positions. All VA PARS team members are required to comply with this PS SOP. This SOP requires VA PARS team members to collaborate, participate, and recognize the shared, related, and interdependent responsibility to provide effective and efficient personnel security services.",
+    "roles": [
+      {
+        "name": "Information System Owner and/or Designee",
+        "responsibilities": []
+      },
+      {
+        "name": "Human Resources (HR) Management Offices will:",
+        "responsibilities": [
+          "Ensure all positions are designated with the appropriate risk or sensitivity level in accordance with the Position Designation Application Tool (PDAT) and ensure that each appointee and employee receive a background investigation commensurate with the position risk or sensitivity level.",
+          "Ensure position risk and sensitivity level designations are consistently applied to all positions in accordance with 5 CFR Part 731, Suitability, and 5 CFR Part 732, National Security Positions, and the VA Knowledge Service. When appropriate, refer appointees and employees in Public Trust and National Security positions to the Security and Investigations Center (SIC) for initiation and adjudication of the investigation.",
+          "Ensure appointees and employees in Low Risk/non-sensitive positions have background investigations initiated and adjudicated at the local level within established timeframes. Adjudicative determinations must be made by appropriately trained personnel and reported to the Office of Personnel Management (OPM).",
+          "Ensure a fingerprint Special Agreement Check (SAC) is conducted on all new appointees who are exempt from the requirement to have a National Agency Check with Inquiries (NACI) or higher-level investigation. Whenever possible, the SAC should be performed prior to the appointee’s entrance on duty. When this is not possible, the SAC must be performed as part of the in-processing procedures. Ensure the SAC is adjudicated by appropriately trained personnel no later than 5 workdays after the results are received.",
+          "Ensure all VA PARS team members and contractors are successfully in-processed to and out- processed from the organization."
+        ]
+      },
+      {
+        "name": "Contracting Officer Representative (COR) will:",
+        "responsibilities": [
+          "Ensure appropriate language is included in applicable contracts so the Statement of Work (SOW) accurately reflects the requirements of the contract. The SOW (or other defining documentation related to the contract) must be reviewed using the PDAT and given the appropriate designation.",
+          "Ensure all contractor employees who are not exempt from the investigative requirement are referred to the SIC for initiation and adjudication of the appropriate level of investigation.",
+          "Ensure a SAC is initiated on all new contractor employees who are exempt from investigative requirements and who provide direct and/or ancillary health care services at VA facilities or have access to VA information systems or sensitive information per VA Directive 0710 May 2, 2016.",
+          "Ensure the SAC is adjudicated by appropriately trained personnel no later than 5 business days after the results are received.",
+          "Ensure appropriate personnel security contract clauses are included in the contracts."
+        ]
+      },
+      {
+        "name": "Appropriate Information System Security Officers (ISSO) will:",
+        "responsibilities": []
+      }
+    ],
+    "references": [
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Directive 0710, Personnel Security and Suitability Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information Systems VA Information Security Program",
+      "VA Handbook 6500.6, Contract Security",
+      "VA Handbook 0735 Homeland Security Presidential Directive 12 (HSPD-12) Program",
+      "VA Knowledge Service VA Knowledge Service, Risk Management Framework for VA Information Systems – Tier 3: VA Information Security Program"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "RA": {
+    "familyNumber": 14,
+    "purpose": "This SOP establishes procedures for the implementation of Risk Assessment (RA) security controls for VA PARS in accordance with Federal Law, VA policy, and the Office of Information Security (OIS) requirements.",
+    "scope": "This SOP outlines procedures that apply to those involved in the implementation of the RA security controls for VA PARS. This includes the ISO, ISSO, system steward(s), and VA PARS team members.",
+    "policy": "The system-specific procedures outlined in this SOP are intended to ensure compliance with: » VA Directive 6500 » VA Knowledge Service » NIST Special Publication 800-53, Revision 4 » NIST Special Publication 800-37 » NIST Special Publication 800-60",
+    "roles": [
+      {
+        "name": "Information System Owner (ISO)",
+        "responsibilities": [
+          "Following initial or updated system security categorization, initiates an RMF Step 1 workflow to obtain the Authorizing Official’s approval for the security categorization decision.",
+          "VA PARS is a PaaS system and relies on VAEC Azure to monitor ICAMP to maintain awareness of the system’s information security posture.",
+          "Provides valid credentials for all VA PARS system components to VA Cyber Security Operations Center (CSOC) for credentialed scanning."
+        ]
+      },
+      {
+        "name": "Information System Security Officer (ISSO)",
+        "responsibilities": [
+          "Monitors the security controls in the information system on an ongoing basis for effectiveness and adequacy of system security controls using the VA GRC tool, eMASS."
+        ]
+      },
+      {
+        "name": "System Steward(s)",
+        "responsibilities": [
+          "Manages VA PARS POA&M to ensure that it documents all assessed and scanned vulnerabilities."
+        ]
+      },
+      {
+        "name": "Development Team Members",
+        "responsibilities": [
+          "Upon assignment, the VA PARS development team members remediate scanned or assessed vulnerabilities."
+        ]
+      }
+    ],
+    "references": [
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "NIST 800-53A, Revision 4, Assessing Security and Privacy Controls in Federal Information Systems and Organizations",
+      "NIST 800-60 Volume 1, Revision 1, Guide for Mapping Types of Information, and Information Systems to Security Categories",
+      "NIST 800-60 Volume 2, Revision 1, Guide for Mapping Types of Information, and Information Systems to Security Categories: Appendices",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information Systems VA Information Security Program",
+      "VA Knowledge Service",
+      "Enterprise Security Operations Standard Operating Procedure Continuous Monitoring, Version 1.2, October 2019",
+      "Enterprise Security Operations Standard Operating Procedure Privacy and Security Control Reviews, Version 4.2, December 2018",
+      "Enterprise Security Operations Standard Operating Procedure Privacy and Security Control Reviews, Version 4.2 Addendum/Errata Notice, March 2019",
+      "Enterprise Security Operations Standard Operating Procedure Records Management, Version 3.2, December 2018",
+      "Enterprise Security Operations Standard Operating Procedure Risk Assessment (A&A), Version 4.1, October 2019"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "SA": {
+    "familyNumber": 15,
+    "purpose": "The purpose of this SOP is to establish procedures for System and Services Acquisition (SA) for the VA PARS COR who is involved with requirements, procedures, and responsibilities for ensuring VA PARS contract and acquisitions address and comply with current federal requirements. VA security policies protect and control VA-sensitive information throughout the acquisition life cycle.",
+    "scope": "This SOP is applicable to VA PARS COR who is involved in the generation of requirements and the procurement of, IT products and acquisition of external information system requirements for ensuring that contract documents contain adequate security requirements. The information in this SOP is intended to maintain the operational environment of the information systems and allows the organization to monitor any environmental activity. It will also help protect the CIA information systems for continuance of essential mission and business functions that limit damage and reduce recovery time and costs.",
+    "policy": "The intent of this document is to facilitate the VA PARS implementation procedures for NIST SP 800-53 SA security controls. VA PARS team members are to comply with the SA SOP as required by VA Directive 6500, VA Handbook 6500.6, and VA Handbook 6500.5. This SOP requires ISO and staff offices to collaborate, participate, and recognize the shared, related, and interdependent responsibility to provide effective and efficient information security to the information system. All VA PARS team members will follow the procedures outlined in this document. System and Service Acquisition (SA) is part of the SDLC and encompasses NIST SP 800-12, Introduction to Computer Security and NIST SP 800-37, Guide for Applying the Risk Management Framework to Federal Information Systems. The SA SOP requires that information security requirements be managed throughout the phases of the SDLC. Office of Management and Budget (OMB) Circular A-130 defines capital planning and investment control as a management process for ongoing identification, selection, control, and evaluation of investments in information resources. The VA determines the resources (funding, staffing, etc.) required for the cybersecurity requirements to protect the information system or information system service as part of its Planning, Programming, and Budget Execution process (PPBE).",
+    "roles": [
+      {
+        "name": "Information System Owner (ISO)",
+        "responsibilities": [
+          "Develops, documents, distributes, and updates VA PARS procedures to all affected employees, contractors, and other staff members.",
+          "Reviews SA SOP at least once every 365 calendar days and updates every 5 years or when changes occur in the procedures or regulations, whichever is the earliest.",
+          "Executes ISAs/MOUs for any external information systems.",
+          "Responsible for all acquisitions using OIT dollars for equipment which will touch the VA network.",
+          "Makes certain all OIT acquisition requests for IT hardware, software and services are entered in the VA Light Electronic Action Framework (LEAF).",
+          "Ensures that all IT products/services, as well as any non-IT products that connect to a VA network operated and maintained by OIT, or that store sensitive data, are entered, and approved in LEAF.",
+          "Documents the SA requirements and external information system services process in the GRC tool, eMASS."
+        ]
+      },
+      {
+        "name": "Information Systems Security Officer (ISSO)",
+        "responsibilities": [
+          "Audits the implementation of all the technologies when mandated by policy.",
+          "Provides guidance on the use of approved VA technologies supporting data protection for all users under their purview.",
+          "Verifies and validates, in conjunction with the Information System Owner and managers, that appropriate security measures are implemented and functioning as intended.",
+          "Participates in the review and completion of VA Handbook 6500.6 Appendix A, Checklist of Information Security in the Initiation Phase of IT Service Acquisitions.",
+          "Participates in pre-procurement assessment and review of ACL Communication Profile Worksheet to conduct a MDRA.",
+          "Reviews contracts, Statements of Work (SOW), and agreements to confirm appropriate security language and sensitivity requirements are addressed with Human Resource (HR), Contracting Officer/Contracting Officer Representatives (CO/COR).",
+          "Collaborates with system owners and VA senior management to ensure security is adequately planned throughout the SDLC and reflected in VA’s budget as well as reported in yearly Federal Information Security Modernization Act (FISMA) submissions.",
+          "Verifies and validates the SA requirements in the GRC tool, eMASS."
+        ]
+      },
+      {
+        "name": "System Steward (SS)",
+        "responsibilities": [
+          "Assigns user roles to generate Risk Management Framework (RMF) Security Authorization Packages.",
+          "Maintains system-level information.",
+          "Manages the System’s security categorization.",
+          "Creates POA&M Items.",
+          "Documents Control Correlation Identifier (CCI) compliance and control implementation status. » Uploads and manages Artifacts.",
+          "Initiates workflows and package submission."
+        ]
+      },
+      {
+        "name": "Contracting Officer Representative (COR)",
+        "responsibilities": [
+          "Completes the VA Handbook 6500.6 Appendix A Checklist for service acquisitions and contract security.",
+          "Works with the ISSO and PO to ensure contracts contain the required security language necessary for compliance with FISMA and 38 U.S.C. §§ 5721-5728.",
+          "Provides adequate security for information and information systems used by the contractor, including the requirement for signing the VA ROB.",
+          "Ensures contract requirements for contractors to meet the appropriate background investigation requirements in accordance with VA Directive and Handbook 0710.",
+          "Ensures contractors complete VA’s initial and annual security and privacy awareness training, and any annual and/or additional RBT as outlined in the contract.",
+          "Monitors the contract to ensure that security requirements are being met, consulting with ISSO and/or PO as necessary.",
+          "Coordinates with CO, as appropriate, to ensure all security breaches involving VA sensitive information are reported to CSOC within one hour of receipt of breach notification from the contractor.",
+          "Monitors compliance within contract or agreement security requirements throughout the contract.",
+          "Ensures contractor understands and implements the IT security requirements for system interconnection documents required in MOU-ISA."
+        ]
+      }
+    ],
+    "references": [
+      "ESO Acquisitions and Contract Security Addendum-Errata",
+      "ESO Acquisitions and Contract Security SOP",
+      "Federal Information Processing Standards (FIPS) 201",
+      "NIST SP 800-12, Introduction to Computer Security",
+      "NIST SP 800-160, Systems Security Engineering",
+      "NIST SP 800-161, Supply Chain Risk Management Practices for Federal Information Systems and Organizations",
+      "NIST SP 800-37, Guide for Applying the Risk Management Framework (RMF) to Federal Information Systems: A Security Life Cycle Approach",
+      "NIST SP 800-53, Revision 4, Security and Privacy Controls for Federal Information Systems and Organizations",
+      "OMB Circular A-11 Preparation, Submission and Execution of the Budget, especially Part 7, as OMB Memorandum M-00-07 Incorporating and Funding Security in Information Systems Investments",
+      "VA Directive 0735 Homeland Security Presidential Directive 12 (HSPD-12) Program",
+      "VA Directive 6008, Acquisition and Management of VA Information Technology",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information Systems VA Information Security Program",
+      "VA Directive 6513, Secure External Connections",
+      "VA Handbook 6500.5, Incorporating Security and Privacy into the System Development Life Cycle (SDLC)",
+      "VA Handbook 6500.6, Contract Security",
+      "VA Knowledge Service"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "SC": {
+    "familyNumber": 16,
+    "purpose": "This SOP is developed to establish the System and Communications Protection (SC) procedures required by the SC security control for VA PARS as outlined in VA Directive 6500 and Knowledge Service. The intent of this document is to facilitate the implementation of VA PARS implementation procedures for NIST. All VA PARS team members are required to comply with this SC SOP. OIT reviews and updates the current SC policies and applicable procedures every 5 years. Knowledge Service contains the SC Policy for OIT. VA OIT outlined VA’s system security controls based on the current version of NIST SP 800-53 that are required for the effective implementation of the SC family.",
+    "scope": "This SOP is applicable to all VA PARS team members involved in developing, safeguarding, or utilizing VA PARS where VA PARS information system resides. The information in this SOP is intended to maintain the operational environment of the information systems and allow the organization to monitor and manage any system and communication protection activity. It will also help protect the confidentiality, integrity, availability of information systems for continuance of essential missions and business functions and handle the situation in a way that limits damage and reduces recovery time and costs.",
+    "policy": "The intent of this document is to facilitate the implementation of VA PARS implementation procedures for NIST SC security controls. All VA PARS team members are required to comply with this SC SOP. This SOP requires VA PARS team members to collaborate, participate, and recognize the shared, related, and interdependent responsibility to provide effective and efficient information security to the VA PARS information system. All VA PARS team members and contractors will follow the procedures outlined in this document.",
+    "roles": [
+      {
+        "name": "Information System Owner (ISO):",
+        "responsibilities": [
+          "Ensuring compliance with federal security regulations and VA security policies.",
+          "Developing, documenting, distributing, and updating VA PARS procedures to all affected employees, and contractors.",
+          "Reviewing the procedures annually or when significant changes occur and updating as necessary.",
+          "Documenting the SC requirements in a VA approved GRC tool.",
+          "The ISO will ensure that cryptographic mechanisms implemented are compliant with current VA-approved encryption i.e., Federal Information Processing Standards (FIPS) 140-2 or current version."
+        ]
+      },
+      {
+        "name": "Information Systems Security Officer (ISSO):",
+        "responsibilities": [
+          "Audit the implementation of all the technologies when mandated by policy.",
+          "Provide guidance on the use of approved VA technologies supporting data protection for all users under their purview.",
+          "Verifying and validating, in conjunction with the information system owner and product owner, that appropriate security measures are implemented and functioning as intended.",
+          "Report any violations of policy governing SC in accordance with KNOWLEDGE SERVICE to local management and enter an information security incident in the VA incident reporting system according to Enterprise Service Operations (ESO) SOP Incident Reporting, as applicable.",
+          "Verifying and validating the SC requirements in the approved GRC tool."
+        ]
+      },
+      {
+        "name": "System Steward (SS)",
+        "responsibilities": [
+          "Responsibilities within the GRC tool include: Assigning user roles to generate an RMF Security Authorization Package Maintaining system-level information Managing the system’s security categorization Creating POA&M items Documenting Control Correlation Identifier (CCI) compliance and control implementation status Uploading and managing artifacts Initiating workflows and package submission"
+        ]
+      }
+    ],
+    "references": [
+      "CNSS Policy 15; NSTISSI No. 7003",
+      "CNSSI_7003_PDS_September_2015",
+      "DISA STIG requirements",
+      "ESO SOP SC Data Protection",
+      "FIPS 140-2",
+      "FIPS 140-3",
+      "NIST Special Publication 800-111 Guide to Storage Encryption Technologies for End User Devices",
+      "NIST Special Publication 800-113 Guide to SSL VPNs",
+      "NIST Special Publication 800-213 IoT Device Cybersecurity Guidance for the Federal Government: Establishing IoT Device Cybersecurity Requirements",
+      "NIST Special Publication 800-52 Guidelines for the Selection, Configuration, and Use of Transport Layer Security (TLS) Implementations",
+      "NIST Special Publication 800-53 Rev 4 Security and Privacy Controls for Federal Information Systems and Organizations",
+      "NIST Special Publication 800-77 Guide to IPsec VPNs",
+      "NIST Special Publication 800-81 Secure Domain Name System (DNS) Deployment Guide",
+      "OIS DAS Memo - External Connection through TIC, July 10, 2015",
+      "OIT Enterprise Infrastructure Baseline – Wide Area Network Standards and CRISP Baseline",
+      "VA Directive 0735 Homeland Security Presidential Directive 12 (HSPD-12) Program » VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information Systems VA Information Security Program",
+      "VA Directive 6513: Secure External Connections",
+      "VA Enterprise IT Infrastructure Standard _QoS 1-12",
+      "VA Handbook 6500.11: VA Firewall Configuration",
+      "VA Knowledge Service",
+      "VA Media Sanitization Users Guide"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  },
+  "SI": {
+    "familyNumber": 17,
+    "purpose": "The purpose of this SOP is to facilitate the implementation of National Institute of Standards and Technology (NIST) 800-53, Revision 4 System and Information Integrity (SI) controls, VA Handbook 6500, Risk Management Framework for VA Information Systems – Tier 3: VA Information Security Program. The SI controls and CCIs guidance within this SOP is taken from Knowledge Service as that is the defining and official source for the agency to follow. The control’s CIA were also pulled from Knowledge Service, then compared to overlays that the agency utilizes (CNSSI-1253 and CNSSI- 1253F). If any overlay listed a control’s CIA at a higher level, that higher level is documented and a change request to the Technical Advisory Group (TAG) will be submitted so that Knowledge Service may be updated accordingly.",
+    "scope": "This SOP is applicable to all VA PARS team members involved in the development, execution, and reporting procedures for the NIST SI control family. The information contained in the SI SOP is intended to maintain the operational environment and allow the organization to address and manage VA PARS system and information integrity. It will also help protect the confidentiality, integrity, availability of the information system for continuance of essential missions and business functions and handle the situation in a way that limits damage and reduces recovery time and costs. All assigned VA PARS team members are required to comply with this SI SOP as required by VA Handbook 6500. This SOP gives guidance for all IA controls and CCIs. The IA controls and CCIs guidance within this SOP is taken from Knowledge Service as that is the defining and official source for the agency to follow. The control’s CIA were also pulled from Knowledge Service, then compared to overlays that the agency utilizes (CNSSI-1253 and CNSSI-1253F). If any overlay listed a control’s CIA at a higher level, we are using what is in Knowledge Service. A change request to the Technical Advisory Group (TAG) will be submitted so that Knowledge Service may be updated accordingly. If your control and/or CCI is inherited, please disregard the guidance as it is no longer applicable.",
+    "policy": "A robust System and Information Integrity policy decreases the threat of unauthorized changes to information systems. The VA PARS team members will collaborate, participate, and recognize the shared, related, and interdependent responsibility to provide effective and efficient information security to the information system. All VA PARS team members will follow the procedures outlined in this document.",
+    "roles": [
+      {
+        "name": "Information System Owner (ISO) and/or Product Owner » Ultimately responsible for the full management and operation of the system.",
+        "responsibilities": [
+          "May delegate responsibilities to those noted below.",
+          "Responsible for ensuring the SOP set forth in this document are followed by the individuals under his/her responsibility.",
+          "Ensures that VA PARS security violations involving SI that are occurring within their assigned area of management control are reported to the ISSO.",
+          "Ensures that all employees, contractors, and other individuals within their assigned area of management control who develop, operate, administer, maintain, or use VA PARS understand they are responsible for reporting actual or suspected VA PARS security incidents to their immediate supervisor or ISSO."
+        ]
+      },
+      {
+        "name": "Information System Security Officer (ISSO)",
+        "responsibilities": [
+          "Responsible for ensuring that the SI controls are being satisfied by the security measures that were implemented.",
+          "Will work with OIT technical staff to determine the nature and scope of security incidents."
+        ]
+      }
+    ],
+    "references": [
+      "NIST 800-53, Revision 4, Security and Privacy Controls for Federal Systems",
+      "VA Directive 6500, VA Cybersecurity Program",
+      "VA Handbook 6500, Risk Management Framework for VA Information Systems VA Information Security Program",
+      "RCS 10-1",
+      "ESO Data and Media Protection Standard Operating Procedure",
+      "VA Knowledge Service (Knowledge Service Home Page) Christina VanMetre Information System Owner"
+    ],
+    "sections": {
+      "purpose": 1,
+      "scope": 2,
+      "policy": 3,
+      "roles": 4,
+      "procedures": 5,
+      "references": 6
+    }
+  }
+}

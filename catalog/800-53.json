@@ -303,7 +303,7 @@
                             "enhancement_name": "Inactivity Logout",
                             "status": "active",
                             "nist_800_53": {
-                                "baselines": ["High"],
+                                "baselines": ["Moderate", "High"],
                                 "control_statement": "Require users to log out after an organization-defined time period of expected inactivity or per specific triggers.",
                                 "discussion": "This differs from a session lock (AC-11); it requires actually logging out rather than just locking the session."
                             },
@@ -397,7 +397,7 @@
                             "enhancement_name": "Disable Accounts for High-Risk Individuals",
                             "status": "active",
                             "nist_800_53": {
-                                "baselines": ["High"],
+                                "baselines": ["Moderate", "High"],
                                 "control_statement": "Disable accounts of users posing a significant risk within an organization-defined time period of discovery.",
                                 "discussion": "Speed is critical here; delay increases exposure from an already-identified risk."
                             },
@@ -1694,7 +1694,7 @@
                             "enhancement_name": "Disable Wireless Networking",
                             "status": "active",
                             "nist_800_53": {
-                                "baselines": [],
+                                "baselines": ["Moderate", "High"],
                                 "control_statement": "Disable, when not intended for use, wireless networking capabilities internally embedded within system components."
                             },
                             "va_overlay": {

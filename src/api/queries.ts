@@ -91,6 +91,10 @@ export function useAiRelatedDraft() {
   return useMutation({ mutationFn: api.aiRelatedDraft });
 }
 
+export function useAiSuggestOdp() {
+  return useMutation({ mutationFn: api.aiSuggestOdp });
+}
+
 export function useExportFile() {
   return useMutation({ mutationFn: (req: ExportRequest) => api.exportFile(req) });
 }

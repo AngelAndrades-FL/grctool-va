@@ -206,8 +206,8 @@ export function RichTextEditor({
           '& .lex-bold': { fontWeight: 700 },
           '& .lex-italic': { fontStyle: 'italic' },
           '& .lex-underline': { textDecoration: 'underline' },
-          '& .lex-ul': { margin: '0 0 8px', paddingLeft: 24, listStyleType: 'disc' },
-          '& .lex-ol': { margin: '0 0 8px', paddingLeft: 24, listStyleType: 'decimal' },
+          '& .lex-ul': { margin: '0 0 8px', paddingLeft: '20px', listStyleType: 'disc' },
+          '& .lex-ol': { margin: '0 0 8px', paddingLeft: '20px', listStyleType: 'decimal' },
           '& .lex-li': { margin: '2px 0' },
           '& .lex-placeholder': {
             position: 'absolute',

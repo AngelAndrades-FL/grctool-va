@@ -9,6 +9,8 @@
 import type {
   AiEvaluateRequest,
   AiEvaluation,
+  AiOdpSuggestions,
+  AiOdpSuggestRequest,
   AiRelatedDraft,
   AiRelatedDraftRequest,
   AiReviseRequest,
@@ -486,7 +488,7 @@ export function parseRevisionResponse(raw: string): Pick<AiRevision, 'revisedNar
 
 /* ------------------------------------------------- related-controls draft */
 
-const RELATED_NARRATIVE_MAX_CHARS = 4000;
+export const DEFAULT_RELATED_NARRATIVE_MAX_CHARS = 12000;
 
 export const RELATED_DRAFT_PROMPT_TEMPLATE = `You are a senior federal security control assessor (NIST SP 800-53A) helping a
 system owner draft part of the System Security Plan implementation statement for ONE target control,
@@ -536,11 +538,12 @@ Respond with a single JSON object and nothing else (no prose, no code fences):
 }`;
 
 export function renderRelatedDraftPrompt(req: AiRelatedDraftRequest): string {
+  const maxChars = req.maxNarrativeChars && req.maxNarrativeChars > 0 ? req.maxNarrativeChars : DEFAULT_RELATED_NARRATIVE_MAX_CHARS;
   const related = req.related
     .filter((r) => r.narrative.trim())
     .map((r) => {
       const text = r.narrative.trim();
-      const clipped = text.length > RELATED_NARRATIVE_MAX_CHARS ? `${text.slice(0, RELATED_NARRATIVE_MAX_CHARS)}…` : text;
+      const clipped = text.length > maxChars ? `${text.slice(0, maxChars)}…` : text;
       return `### ${r.controlId} — ${r.controlName}\n"""\n${clipped}\n"""`;
     })
     .join('\n\n');
@@ -632,4 +635,93 @@ export function formatRelatedDraft(draft: Pick<AiRelatedDraft, 'elements'>): str
         .join('\n'),
     )
     .join('\n\n');
+}
+
+/* ------------------------------------------------ organization-defined values */
+
+export const ODP_SUGGEST_PROMPT_TEMPLATE = `You are a senior federal security control assessor (NIST SP 800-53A) helping a
+system owner fill in the organization-defined parameter values of ONE control, using only information
+the owner has already recorded for that control.
+
+## Control
+{{control_id}} — {{control_name}}
+
+### Control statement (verbatim, NIST SP 800-53 Rev 5)
+{{statement_template}}
+
+## Information recorded for this control
+### Implementation narrative
+"""
+{{narrative}}
+"""
+
+### Ownership
+{{ownership}}
+
+### Evidence artifacts
+{{artifacts}}
+
+## Values to fill
+{{parameters}}
+
+## Your task
+1. For each value above, look for an answer stated explicitly in the information recorded for this
+   control (narrative, ownership, artifacts). Match by meaning, not by wording.
+2. Suggest a value only when the recorded information states it. Quote or closely paraphrase it and keep
+   it short enough to drop into a form field (a role, a number of days, a frequency, a list of events).
+3. Never invent, assume or generalize. If a value is not stated, leave it out of the response.
+4. For each suggestion give "basis": a few words saying where it came from (e.g. "narrative, element b").
+
+Respond with a single JSON object and nothing else (no prose, no code fences):
+{
+  "suggestions": [
+    { "parameterId": "<id from the list above>", "value": "<value>", "basis": "<where it was found>" }
+  ]
+}`;
+
+export function renderOdpSuggestPrompt(req: AiOdpSuggestRequest): string {
+  const vars: Record<string, string> = {
+    control_id: req.controlId,
+    control_name: req.controlName,
+    statement_template: req.statementTemplate || '(none)',
+    narrative: req.narrative.trim() || '(empty)',
+    ownership:
+      [req.responsibleRole && `Responsible role: ${req.responsibleRole}`, req.owner && `Owner: ${req.owner}`]
+        .filter(Boolean)
+        .join('\n') || '(none)',
+    artifacts: req.artifacts.length
+      ? req.artifacts
+          .map((a) => `- ${a.title || a.evidenceType} (${a.evidenceType})${a.frequency ? `, recurs ${a.frequency}` : ''}`)
+          .join('\n')
+      : '(none)',
+    parameters: req.parameters.map((p) => `- ${p.parameterId}: ${p.label}`).join('\n'),
+  };
+  return ODP_SUGGEST_PROMPT_TEMPLATE.replace(/\{\{(\w+)\}\}/g, (match, key: string) => vars[key] ?? match);
+}
+
+export function parseOdpSuggestResponse(raw: string, req: Pick<AiOdpSuggestRequest, 'parameters'>): AiOdpSuggestions {
+  const json = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  let data: { suggestions?: unknown };
+  try {
+    data = JSON.parse(json) as typeof data;
+  } catch {
+    throw new Error('The AI response was not valid JSON.');
+  }
+  if (!Array.isArray(data?.suggestions)) throw new Error('The AI response did not include a suggestions list.');
+  const known = new Set(req.parameters.map((p) => p.parameterId));
+  const seen = new Set<string>();
+  const suggestions = data.suggestions.flatMap((s) => {
+    const item = s as { parameterId?: unknown; value?: unknown; basis?: unknown };
+    if (typeof item?.parameterId !== 'string' || !known.has(item.parameterId) || seen.has(item.parameterId)) return [];
+    if (typeof item.value !== 'string' || !item.value.trim()) return [];
+    seen.add(item.parameterId);
+    return [
+      {
+        parameterId: item.parameterId,
+        value: item.value.trim(),
+        basis: typeof item.basis === 'string' ? item.basis.trim() : '',
+      },
+    ];
+  });
+  return { suggestions };
 }

@@ -18,7 +18,6 @@ import {
   Typography,
 } from '@mui/material';
 import DescriptionIcon from '@mui/icons-material/Description';
-import BackupIcon from '@mui/icons-material/Backup';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import ArticleIcon from '@mui/icons-material/Article';
 import EventRepeatIcon from '@mui/icons-material/EventRepeat';
@@ -33,7 +32,8 @@ import { recordsToOscal } from '@shared/oscal';
 import { api } from '@/api/client';
 import { useDataAction, useExportFile, useSaveEvidence, useWorkspace, useWorkspaceData } from '@/api/queries';
 import { useAppState } from '@/state/AppState';
-import { buildCsv, buildJsonBackup, buildRecurringCsv, buildSspLiteMarkdown } from '@/domain/export';
+import { buildCsv, buildRecurringCsv, buildSspLiteMarkdown } from '@/domain/export';
+import { buildSopFamilies } from '@/domain/sopExport';
 import { planOscalImport, type OscalImportPlan } from '@/domain/oscalImport';
 
 type ExportFormat = ExportRequest['format'] | 'oscal-package';
@@ -59,6 +59,7 @@ export function Export() {
   const { notify } = useAppState();
   const [pendingFormat, setPendingFormat] = useState<ExportFormat | null>(null);
   const [snPicking, setSnPicking] = useState(false);
+  const [sopBusy, setSopBusy] = useState(false);
   const [snPreview, setSnPreview] = useState<{ result: OscalImportResult; plan: OscalImportPlan } | null>(null);
 
   const options: ExportOption[] = [
@@ -76,13 +77,6 @@ export function Export() {
       detail: 'The System Security Plan as OSCAL v1.2.0 JSON without the evidence files, for tools that only take the SSP.',
       icon: <DescriptionIcon />,
       suggestedName: (id) => `${id}-ssp.json`,
-    },
-    {
-      format: 'json',
-      title: 'JSON backup',
-      detail: 'Every evidence record, verbatim, for archiving or inspection. Use the database backup to restore.',
-      icon: <BackupIcon />,
-      suggestedName: (id) => `${id}-evidence-backup.json`,
     },
     {
       format: 'csv',
@@ -113,8 +107,6 @@ export function Export() {
     switch (format) {
       case 'oscal':
         return JSON.stringify(recordsToOscal(Object.values(rawEvidence), settings).ssp, null, 2);
-      case 'json':
-        return buildJsonBackup(rawEvidence);
       case 'csv':
         return buildCsv(index, evidence);
       case 'markdown':
@@ -177,6 +169,19 @@ export function Export() {
       notify(error instanceof Error ? error.message : 'Export failed', 'error');
     } finally {
       setPendingFormat(null);
+    }
+  };
+
+  const handleSopExport = async () => {
+    if (!index || !settings) return;
+    setSopBusy(true);
+    try {
+      const result = await api.exportSopWord({ families: buildSopFamilies(index, rawEvidence, settings) });
+      if (!result.cancelled) notify(`Exported ${result.familyCount} control families to ${result.path}`, 'success');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Export failed', 'error');
+    } finally {
+      setSopBusy(false);
     }
   };
 
@@ -259,6 +264,29 @@ export function Export() {
                 <ListItemText primary={option.title} secondary={option.detail} sx={{ mr: 12 }} />
               </ListItem>
             ))}
+            <ListItem
+              disableGutters
+              sx={{ py: 1.5, borderTop: 1, borderColor: 'divider' }}
+              secondaryAction={
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!index || !settings || sopBusy}
+                  onClick={() => void handleSopExport()}
+                >
+                  {sopBusy ? 'Exporting…' : 'Export'}
+                </Button>
+              }
+            >
+              <ListItemIcon>
+                <DescriptionIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="POM (Word)"
+                secondary="The POM with the control family SOP sections filled in for every family in the selected baseline: purpose, scope, roles, then each control and enhancement that has an implementation narrative. The cover page, table of contents, front matter and appendices are kept as they are."
+                sx={{ mr: 12 }}
+              />
+            </ListItem>
           </List>
         </Paper>
 

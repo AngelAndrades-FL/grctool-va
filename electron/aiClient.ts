@@ -13,6 +13,8 @@ import type {
   AiConnectionTestResult,
   AiEvaluateRequest,
   AiEvaluation,
+  AiOdpSuggestions,
+  AiOdpSuggestRequest,
   AiRelatedDraft,
   AiRelatedDraftRequest,
   AiReviseRequest,
@@ -21,8 +23,10 @@ import type {
 } from '../shared/types.js';
 import {
   evaluationFromResponse,
+  parseOdpSuggestResponse,
   parseRelatedDraftResponse,
   parseRevisionResponse,
+  renderOdpSuggestPrompt,
   renderPrompt,
   renderRelatedDraftPrompt,
   renderRevisePrompt,
@@ -185,6 +189,16 @@ export async function relatedDraftWithAzure(req: AiRelatedDraftRequest, ai: AiSe
     const client = await createClient(ai);
     const { text } = await complete(client, ai, renderedPrompt, true);
     return { ...parseRelatedDraftResponse(text), renderedPrompt };
+  } catch (error) {
+    rethrow(error, ai);
+  }
+}
+
+export async function suggestOdpWithAzure(req: AiOdpSuggestRequest, ai: AiSettings): Promise<AiOdpSuggestions> {
+  try {
+    const client = await createClient(ai);
+    const { text } = await complete(client, ai, renderOdpSuggestPrompt(req), true);
+    return parseOdpSuggestResponse(text, req);
   } catch (error) {
     rethrow(error, ai);
   }
