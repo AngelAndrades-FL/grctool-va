@@ -308,6 +308,13 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
   };
   const completeness = computeCompleteness(node, form.state.values);
   const minEvidenceDate = atoMinDate(settings?.lastAtoDate);
+  const setLastReviewed = (iso: string | null) => {
+    form.setFieldValue('dates.lastReviewedOn', iso);
+    if (iso) {
+      const staleAfterDays = settings?.evidenceStaleAfterDays ?? 365;
+      form.setFieldValue('dates.nextReviewDue', DateTime.fromISO(iso).plus({ days: staleAfterDays }).toISODate());
+    }
+  };
   const recurringSuggested = useMemo(
     () => suggestsRecurringEvidence(`${node.statement} ${node.discussion}`),
     [node.statement, node.discussion],
@@ -747,7 +754,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
             title="Dates"
             subtitle="Evidence-as-of drives the staleness warnings and the pre-ATO evidence check."
           >
-            <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 2 }}>
               {(
                 [
                   ['dates.implementedOn', 'Implemented on'],
@@ -761,14 +768,18 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                     <DatePicker
                       label={label}
                       value={isoToDate(field.state.value)}
-                      onChange={(value) => field.handleChange(value?.isValid ? value.toISODate() : null)}
+                      onChange={(value) => {
+                        const iso = value?.isValid ? value.toISODate() : null;
+                        if (name === 'dates.lastReviewedOn') setLastReviewed(iso);
+                        else field.handleChange(iso);
+                      }}
                       minDate={minEvidenceDate}
-                      slotProps={{ textField: { size: 'small', sx: { minWidth: 180 } }, field: { clearable: true } }}
+                      slotProps={{ textField: { size: 'small', fullWidth: true }, field: { clearable: true } }}
                     />
                   )}
                 </form.Field>
               ))}
-            </Stack>
+            </Box>
           </SectionCard>
           )}
 
@@ -977,7 +988,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
           disabled={isNa}
           onClick={() => {
             form.setFieldValue('implementationStatus', 'implemented');
-            form.setFieldValue('dates.lastReviewedOn', DateTime.now().toISODate());
+            setLastReviewed(DateTime.now().toISODate());
             void form.handleSubmit();
             notify(`${node.id} marked implemented`, 'success');
           }}

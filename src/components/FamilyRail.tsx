@@ -8,6 +8,7 @@ import {
   List,
   ListItemText,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import { useAppState } from '@/state/AppState';
@@ -79,12 +80,16 @@ export function FamilyRail() {
                   <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
                     {stat.id}
                   </Typography>
-                  <Chip
-                    size="small"
-                    variant="outlined"
-                    label={`${stat.complete}/${stat.inBaseline}`}
-                    sx={{ height: 20, fontSize: 11 }}
-                  />
+                  <Tooltip
+                    title={`${stat.complete} of ${stat.inBaseline} applicable controls are complete (at least 80% evidence completeness). Controls marked N/A with a rationale are excluded.`}
+                  >
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={`${stat.complete}/${stat.inBaseline}`}
+                      sx={{ height: 20, fontSize: 11 }}
+                    />
+                  </Tooltip>
                 </Stack>
               }
               secondary={
@@ -92,13 +97,17 @@ export function FamilyRail() {
                   <Typography variant="caption" noWrap sx={{ display: 'block', color: 'text.secondary' }}>
                     {stat.name}
                   </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={stat.progress}
-                    aria-label={`${stat.id} completeness`}
-                    aria-valuetext={`${stat.complete} of ${stat.inBaseline} controls complete`}
-                    sx={{ mt: 0.75, height: 4, borderRadius: 2 }}
-                  />
+                  <Tooltip
+                    title={`${Math.round(stat.progress)}% of applicable ${stat.id} controls are complete (at least 80% evidence completeness)`}
+                  >
+                    <LinearProgress
+                      variant="determinate"
+                      value={stat.progress}
+                      aria-label={`${stat.id} completeness`}
+                      aria-valuetext={`${stat.complete} of ${stat.inBaseline} controls complete`}
+                      sx={{ mt: 0.75, height: 4, borderRadius: 2 }}
+                    />
+                  </Tooltip>
                 </Box>
               }
             />

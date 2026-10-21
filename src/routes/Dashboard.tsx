@@ -19,7 +19,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { DataGrid, type GridColDef, type GridRowParams } from '@mui/x-data-grid';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { PieChart } from '@mui/x-charts/PieChart';
-import { Gauge, gaugeClasses } from '@mui/x-charts/Gauge';
+import { GaugeContainer, GaugeValueArc, GaugeValueText, gaugeClasses, useGaugeState } from '@mui/x-charts/Gauge';
 import { DateTime } from 'luxon';
 import type { ImplementationStatus } from '@shared/types';
 import { useWorkspaceData } from '@/api/queries';
@@ -136,6 +136,58 @@ function StatCard({
   );
 }
 
+const COVERAGE_BANDS = [
+  { from: 0, to: 60, colour: '#9e9e9e' },
+  { from: 60, to: 80, colour: '#fbc02d' },
+  { from: 80, to: 100, colour: '#43a047' },
+];
+const COVERAGE_TICKS = [60, 80];
+
+function coverageColour(value: number): string {
+  return value >= 80 ? '#43a047' : value > 60 ? '#fbc02d' : '#9e9e9e';
+}
+
+function CoverageBands() {
+  const { startAngle, endAngle, innerRadius, outerRadius, cx, cy } = useGaugeState();
+  const angleOf = (value: number) => startAngle + (value / 100) * (endAngle - startAngle);
+  // Gauge angles are measured clockwise from 12 o'clock.
+  const point = (angle: number, radius: number) => [cx + radius * Math.sin(angle), cy - radius * Math.cos(angle)] as const;
+  const sector = (from: number, to: number) => {
+    const a0 = angleOf(from);
+    const a1 = angleOf(to);
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    return [
+      `M${point(a0, outerRadius).join(' ')}`,
+      `A${outerRadius} ${outerRadius} 0 ${large} 1 ${point(a1, outerRadius).join(' ')}`,
+      `L${point(a1, innerRadius).join(' ')}`,
+      `A${innerRadius} ${innerRadius} 0 ${large} 0 ${point(a0, innerRadius).join(' ')}`,
+      'Z',
+    ].join(' ');
+  };
+
+  return (
+    <g>
+      {COVERAGE_BANDS.map((band) => (
+        <path key={band.from} d={sector(band.from, band.to)} fill={band.colour} opacity={0.3} />
+      ))}
+      {COVERAGE_TICKS.map((tick) => {
+        const angle = angleOf(tick);
+        const [x1, y1] = point(angle, innerRadius - 2);
+        const [x2, y2] = point(angle, outerRadius + 4);
+        const [lx, ly] = point(angle, outerRadius + 13);
+        return (
+          <g key={tick} className="coverage-tick">
+            <line x1={x1} y1={y1} x2={x2} y2={y2} strokeWidth={1.5} />
+            <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize={11}>
+              {tick}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
@@ -162,6 +214,18 @@ export function Dashboard() {
     setReviewBucket((current) => (current === key ? null : key));
     requestAnimationFrame(() => reviewPanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
   };
+  const [statusFilter, setStatusFilter] = useState<ImplementationStatus | null>(null);
+  const statusPanelRef = useRef<HTMLDivElement>(null);
+  const selectStatus = (status: ImplementationStatus) => {
+    setStatusFilter((current) => (current === status ? null : status));
+    requestAnimationFrame(() => statusPanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  };
+  const [roleFilter, setRoleFilter] = useState<string | null>(null);
+  const rolePanelRef = useRef<HTMLDivElement>(null);
+  const selectRole = (roleId: string) => {
+    setRoleFilter((current) => (current === roleId ? null : roleId));
+    requestAnimationFrame(() => rolePanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  };
   const toggleDrill = (key: DrillKey) => setDrillKey((current) => (current === key ? null : key));
 
   const stats = useMemo(() => {
@@ -183,6 +247,13 @@ export function Dashboard() {
     };
     const reviewBuckets = { overdue: 0, in30: 0, in90: 0, later: 0, unscheduled: 0 };
     const reviewDrill: Record<ReviewBucket, DrillRow[]> = { overdue: [], in30: [], in90: [], later: [], unscheduled: [] };
+    const statusDrill = new Map<ImplementationStatus, DrillRow[]>();
+    const pushStatusRow = (row: DrillRow) => {
+      const rows = statusDrill.get(row.status) ?? [];
+      rows.push(row);
+      statusDrill.set(row.status, rows);
+    };
+    const roleDrill = new Map<string, DrillRow[]>();
 
     let complete = 0;
     let notStarted = 0;
@@ -210,7 +281,10 @@ export function Dashboard() {
         });
       }
       // Documented N/A controls are out of every coverage, gap, staleness and review metric.
-      if (isDocumentedNa(record)) continue;
+      if (isDocumentedNa(record)) {
+        pushStatusRow(drill.notApplicable[drill.notApplicable.length - 1]);
+        continue;
+      }
 
       const score = computeCompleteness(node, record);
       const gaps = buildGapReport(node, record, { staleAfterDays, lastAtoDate });
@@ -249,9 +323,22 @@ export function Dashboard() {
 
       const coverage = evidenceTypeCoverage(node, record);
       const artifacts = record?.artifacts.length ?? 0;
+      pushStatusRow(
+        drillRow(
+          status === 'not_applicable'
+            ? 'N/A rationale missing'
+            : coverage.missing.join(', ') || gaps.reasons.join(' ') || 'None',
+        ),
+      );
       (score >= COMPLETE_THRESHOLD ? drill.complete : drill.incomplete).push(
         drillRow(coverage.missing.join(', ') || (score >= COMPLETE_THRESHOLD ? 'None' : gaps.reasons.join(' ') || 'None')),
       );
+      const roleId = record?.ownership.responsibleRole.trim() ?? '';
+      const roleRows = roleDrill.get(roleId) ?? [];
+      roleRows.push(
+        drillRow([record?.ownership.owner, record?.ownership.poc].filter(Boolean).join(' · ') || 'No owner recorded'),
+      );
+      roleDrill.set(roleId, roleRows);
       if (coverage.missing.length > 0 || (node.evidenceRequired.length === 0 && artifacts === 0)) {
         missingEvidence.push({
           id: node.id,
@@ -300,12 +387,17 @@ export function Dashboard() {
       // Worst-covered families first: that is where the remaining work actually is.
       familyRows: [...familyTotals.entries()]
         .map(([familyId, v]) => ({ familyId, ...v }))
-        .filter((f) => f.incomplete > 0)
-        .sort((a, b) => b.incomplete - a.incomplete)
-        .slice(0, 12),
+        .sort((a, b) => b.incomplete - a.incomplete || a.familyId.localeCompare(b.familyId)),
       missingEvidence: missingEvidence.sort((a, b) => a.completeness - b.completeness),
       reviewBuckets,
       reviewDrill,
+      statusDrill,
+      roleRows: [...roleDrill.entries()]
+        .map(([roleId, rows]) => {
+          const role = settings?.responsibleRoles.find((r) => r.id === roleId);
+          return { roleId, label: roleId === '' ? 'Not assigned' : (role?.label ?? roleId), rows };
+        })
+        .sort((a, b) => b.rows.length - a.rows.length || a.label.localeCompare(b.label)),
       drill,
     };
   }, [index, evidence, settings, baseline, mode]);
@@ -439,6 +531,8 @@ export function Dashboard() {
             ? '#ffa726'
             : '#43a047';
 
+  const statusRows = statusFilter ? (stats.statusDrill.get(statusFilter) ?? []) : [];
+  const selectedRole = roleFilter === null ? undefined : stats.roleRows.find((r) => r.roleId === roleFilter);
   const statusSlices = [...stats.statusCounts.entries()]
     .filter(([, count]) => count > 0)
     .map(([status, count]) => ({
@@ -575,18 +669,25 @@ export function Dashboard() {
               subtitle={`Controls at ${COMPLETE_THRESHOLD}%+ completeness`}
             >
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
-                <Gauge
-                  width={200}
-                  height={180}
+                <GaugeContainer
+                  width={300}
+                  height={240}
                   value={stats.coveragePercent}
                   startAngle={-110}
                   endAngle={110}
-                  text={({ value }) => `${value}%`}
-                  sx={{
-                    [`& .${gaugeClasses.valueText}`]: { fontSize: 28, fontWeight: 600 },
-                    [`& .${gaugeClasses.valueArc}`]: { fill: scoreColour(stats.coveragePercent) },
-                  }}
-                />
+                  innerRadius="62%"
+                  outerRadius="82%"
+                  sx={(theme) => ({
+                    [`& .${gaugeClasses.valueText}`]: { fontSize: 36, fontWeight: 600 },
+                    [`& .${gaugeClasses.valueArc}`]: { fill: coverageColour(stats.coveragePercent) },
+                    '& .coverage-tick line': { stroke: theme.palette.text.secondary },
+                    '& .coverage-tick text': { fill: theme.palette.text.secondary },
+                  })}
+                >
+                  <CoverageBands />
+                  <GaugeValueArc />
+                  <GaugeValueText text={({ value }) => `${value}%`} />
+                </GaugeContainer>
               </Box>
               <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', textAlign: 'center' }}>
                 Average completeness across all applicable controls: {stats.averageScore}%
@@ -594,10 +695,17 @@ export function Dashboard() {
             </ChartCard>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 8 }}>
-            <ChartCard title="Implementation status" subtitle="Every applicable control by recorded status, plus those marked N/A">
+          <Grid size={{ xs: 12, md: 4 }}>
+            <ChartCard
+              title="Implementation status"
+              subtitle="Every applicable control by recorded status, plus those marked N/A · select a slice to list the controls"
+            >
               <PieChart
                 height={230}
+                onItemClick={(_event, item) => {
+                  const slice = statusSlices[item.dataIndex];
+                  if (slice) selectStatus(slice.id);
+                }}
                 series={[
                   {
                     data: statusSlices,
@@ -607,18 +715,127 @@ export function Dashboard() {
                     highlightScope: { fade: 'global', highlight: 'item' },
                   },
                 ]}
+                sx={{ '& .MuiPieArc-root': { cursor: 'pointer' } }}
               />
             </ChartCard>
           </Grid>
 
+          <Grid size={{ xs: 12, md: 4 }}>
+            <ChartCard title="Controls by responsible role" subtitle="Applicable controls per assigned role · select a slice to list the controls">
+              <PieChart
+                height={230}
+                onItemClick={(_event, item) => {
+                  const role = stats.roleRows[item.dataIndex];
+                  if (role) selectRole(role.roleId);
+                }}
+                series={[
+                  {
+                    data: stats.roleRows.map((r) => ({
+                      id: r.roleId || '__unassigned',
+                      value: r.rows.length,
+                      label: r.label,
+                      ...(r.roleId === '' && { color: '#9e9e9e' }),
+                    })),
+                    innerRadius: 50,
+                    paddingAngle: 2,
+                    cornerRadius: 3,
+                    highlightScope: { fade: 'global', highlight: 'item' },
+                  },
+                ]}
+                sx={{ '& .MuiPieArc-root': { cursor: 'pointer' } }}
+              />
+            </ChartCard>
+          </Grid>
+
+          {statusFilter && (
+            <Grid size={12}>
+              <Paper variant="outlined" sx={{ p: 2 }} ref={statusPanelRef}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="subtitle2" component="h2">
+                      Implementation status · {STATUS_LABEL[statusFilter]} · {statusRows.length} control
+                      {statusRows.length === 1 ? '' : 's'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Select a row to open the control.
+                    </Typography>
+                  </Box>
+                  <Tooltip title="Close">
+                    <IconButton size="small" onClick={() => setStatusFilter(null)} aria-label="Close implementation status list">
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+                <Box sx={{ height: 380, mt: 1 }}>
+                  <DataGrid<DrillRow>
+                    rows={statusRows}
+                    columns={drillColumnsFor(statusFilter === 'not_applicable' ? 'Rationale' : 'Gaps')}
+                    showToolbar
+                    density="compact"
+                    disableRowSelectionOnClick
+                    onRowClick={(params: GridRowParams<DrillRow>) =>
+                      void navigate({ to: '/control/$controlId', params: { controlId: params.row.id } })
+                    }
+                    initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                    pageSizeOptions={[10, 25, 50]}
+                    sx={{ border: 0, '& .MuiDataGrid-row': { cursor: 'pointer' } }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+          )}
+
+          {selectedRole && (
+            <Grid size={12}>
+              <Paper variant="outlined" sx={{ p: 2 }} ref={rolePanelRef}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="subtitle2" component="h2">
+                      Responsible role · {selectedRole.label} · {selectedRole.rows.length} control
+                      {selectedRole.rows.length === 1 ? '' : 's'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Select a row to open the control.
+                    </Typography>
+                  </Box>
+                  <Tooltip title="Close">
+                    <IconButton size="small" onClick={() => setRoleFilter(null)} aria-label="Close responsible role list">
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+                <Box sx={{ height: 380, mt: 1 }}>
+                  <DataGrid<DrillRow>
+                    rows={selectedRole.rows}
+                    columns={drillColumnsFor('Owner / POC')}
+                    showToolbar
+                    density="compact"
+                    disableRowSelectionOnClick
+                    onRowClick={(params: GridRowParams<DrillRow>) =>
+                      void navigate({ to: '/control/$controlId', params: { controlId: params.row.id } })
+                    }
+                    initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                    pageSizeOptions={[10, 25, 50]}
+                    sx={{ border: 0, '& .MuiDataGrid-row': { cursor: 'pointer' } }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+          )}
+
           <Grid size={{ xs: 12, md: 8 }}>
             <ChartCard
               title="Families needing the most work"
-              subtitle={`Controls above and below ${COMPLETE_THRESHOLD}% completeness`}
+              subtitle={`Controls above and below ${COMPLETE_THRESHOLD}% completeness · select a family to open its controls`}
             >
               <BarChart
                 height={280}
-                xAxis={[{ data: stats.familyRows.map((f) => f.familyId), scaleType: 'band' }]}
+                onAxisClick={(_event, data) => {
+                  const family = stats.familyRows[data?.dataIndex ?? -1];
+                  if (family) void navigate({ to: '/family/$familyId', params: { familyId: family.familyId } });
+                }}
+                sx={{ cursor: 'pointer' }}
+                xAxis={[{ data: stats.familyRows.map((f) => f.familyId), scaleType: 'band', tickLabelInterval: () => true }]}
                 series={[
                   {
                     data: stats.familyRows.map((f) => f.complete),
@@ -650,6 +867,7 @@ export function Dashboard() {
                   {
                     data: REVIEW_BUCKETS.map((b) => b.label),
                     scaleType: 'band',
+                    width: 100,
                   },
                 ]}
                 series={[
@@ -660,21 +878,6 @@ export function Dashboard() {
                   },
                 ]}
               />
-              <Stack direction="row" role="group" aria-label="Review schedule buckets" sx={{ flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                {REVIEW_BUCKETS.map((b) => (
-                  <Chip
-                    key={b.key}
-                    size="small"
-                    component="button"
-                    clickable
-                    aria-pressed={reviewBucket === b.key}
-                    color={reviewBucket === b.key ? 'primary' : 'default'}
-                    variant={reviewBucket === b.key ? 'filled' : 'outlined'}
-                    label={`${b.label}: ${stats.reviewBuckets[b.key]}`}
-                    onClick={() => selectReviewBucket(b.key)}
-                  />
-                ))}
-              </Stack>
             </ChartCard>
           </Grid>
 
