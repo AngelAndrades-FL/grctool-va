@@ -66,12 +66,31 @@ export interface CrossReference {
   shared_evidence_types?: string[];
 }
 
+/** Microsoft's Azure Policy mapping for NIST 800-53 Rev 5: who owns the control and which built-in policies map to it. */
+export type AzureOwnership = 'shared' | 'customer';
+
+export interface AzurePolicyRef {
+  name: string;
+  description: string;
+  /** Allowed effects, e.g. "AuditIfNotExists, Disabled"; "Manual, Disabled" marks a policy that only records an attestation. */
+  effects: string;
+  version: string;
+  /** Policy definition GUID, or the CMA_ id for manual policies. */
+  id: string;
+}
+
+export interface AzureOverlay {
+  ownership: AzureOwnership;
+  policies: AzurePolicyRef[];
+}
+
 export interface CatalogEnhancement {
   enhancement_id: string;
   enhancement_name: string;
   status: ControlStatus;
   nist_800_53: CatalogNist;
   va_overlay?: VaOverlay;
+  azure_overlay?: AzureOverlay;
   plain_english_explanation?: string;
   evidence_required?: EvidenceRequirement[];
 }
@@ -84,6 +103,7 @@ export interface CatalogControl {
   nist_800_53: CatalogNist;
   control_enhancements?: CatalogEnhancement[];
   va_overlay?: VaOverlay;
+  azure_overlay?: AzureOverlay;
   plain_english_explanation?: string;
   evidence_required?: EvidenceRequirement[];
   cross_reference_controls?: CrossReference[];
@@ -325,6 +345,8 @@ export interface EvidenceRecord {
   inScope: boolean;
   naJustification: string;
   origination: ControlDesignation;
+  /** Origination before the Azure overlay was applied; present only while the overlay's value is in effect. */
+  azurePriorOrigination?: ControlDesignation;
   narrative: Narrative;
   odpResponses: OdpResponse[];
   objectiveResponses: ObjectiveResponse[];
@@ -332,6 +354,8 @@ export interface EvidenceRecord {
   artifacts: Artifact[];
   /** Ids of artifacts owned by other controls that also serve as evidence here. */
   linkedArtifactIds: string[];
+  /** This control's evidence type for a linked artifact, keyed by artifact id; absent means the owner's type. */
+  linkedEvidenceTypes?: Record<string, string>;
   ownership: Ownership;
   dates: EvidenceDates;
   poam: PoamEntry;
@@ -453,6 +477,11 @@ export interface AiEvaluateRequest {
   providedEvidenceTypes: string[];
   vaOdpValues: VaOdpValue[];
   vaSpecificRequirements: string[];
+  /** Fully inherited control: the assessment only checks that the narrative names its source. */
+  inherited?: boolean;
+  origination?: ControlDesignation;
+  /** Sent only when the author has accepted the Azure overlay for this control. */
+  azureOverlay?: AzureOverlay;
   /** User-edited prompt text to send instead of rendering the saved template. */
   promptOverride?: string;
 }
@@ -465,6 +494,11 @@ export interface AiReviseRequest {
   /** Verbatim 800-53 statement with its lettered items and [Assignment] blanks. */
   statementTemplate: string;
   narrative: string;
+  /** Microsoft's ownership and Azure Policy mapping for this control, when the control has one. */
+  azureOverlay?: AzureOverlay;
+  origination?: ControlDesignation;
+  /** The recorded origination matches the overlay's ownership. */
+  azureApplied?: boolean;
 }
 
 export interface AiRevision {
@@ -677,7 +711,6 @@ export interface GrcBridge {
   loadSettings(): Promise<AppSettings>;
   saveSettings(settings: AppSettings): Promise<AppSettings>;
   addAttachments(req: AttachmentRequest): Promise<AttachmentResult>;
-  readAttachment(relPath: string): Promise<string | null>;
   revealAttachment(relPath: string): Promise<void>;
   renameAttachment(req: AttachmentRenameRequest): Promise<Pick<Artifact, 'filePath' | 'fileName'>>;
   deleteAttachments(relPaths: string[]): Promise<{ deleted: number }>;
@@ -699,13 +732,8 @@ export interface GrcBridge {
   /** Pick a new workspace folder (null result = cancelled). Existing data is not moved. */
   chooseWorkspaceLocation(): Promise<WorkspaceInfo | null>;
   resetWorkspaceLocation(): Promise<WorkspaceInfo>;
-  /** Tests the given (possibly unsaved) settings, signing in first if needed. */
+  /** Tests the given (possibly unsaved) settings. */
   aiTestConnection(settings: AiSettings): Promise<AiConnectionTestResult>;
-  /** Forgets cached Entra sign-ins so the next request signs in again. */
-  aiSignOut(): Promise<void>;
-  /** Opens the system browser for Entra sign-in; returns the signed-in account name. */
-  aiSignIn(settings: AiSettings): Promise<string | null>;
-  aiSignedInAccount(settings: AiSettings): Promise<string | null>;
   /** Stores the OpenAI API key encrypted with the OS account; it is never returned to the renderer. */
   aiSetApiKey(apiKey: string): Promise<void>;
   aiClearApiKey(): Promise<void>;

@@ -219,6 +219,8 @@ export interface SupplementalRecord {
   >;
   naJustification: string;
   inScope: boolean;
+  azurePriorOrigination?: EvidenceRecord['origination'];
+  linkedEvidenceTypes?: Record<string, string>;
   updatedAt: string;
 }
 
@@ -482,6 +484,10 @@ export function recordsToOscal(
       ),
       naJustification: rec.naJustification,
       inScope: rec.inScope,
+      azurePriorOrigination: rec.azurePriorOrigination,
+      linkedEvidenceTypes: Object.fromEntries(
+        Object.entries(rec.linkedEvidenceTypes ?? {}).filter(([id, t]) => t && rec.linkedArtifactIds?.includes(id)),
+      ),
       updatedAt: rec.updatedAt,
     };
 
@@ -596,6 +602,7 @@ export function readAtoDates(ssp: OscalSsp | null): { lastAtoDate: string | null
         base.origination,
       inScope: sup?.inScope ?? prop(req.props, 'in-scope') !== 'false',
       naJustification: sup?.naJustification ?? '',
+      ...(sup?.azurePriorOrigination ? { azurePriorOrigination: sup.azurePriorOrigination } : {}),
       tags: (prop(req.props, 'tags') ?? '').split(',').filter(Boolean),
       narrative: {
         implementation: {
@@ -619,6 +626,9 @@ export function readAtoDates(ssp: OscalSsp | null): { lastAtoDate: string | null
       processSteps: sup?.processSteps ?? [],
       artifacts: mergeLegacyRecurring(artifacts, sup?.recurringEvidence),
       linkedArtifactIds,
+      ...(sup?.linkedEvidenceTypes && Object.keys(sup.linkedEvidenceTypes).length
+        ? { linkedEvidenceTypes: sup.linkedEvidenceTypes }
+        : {}),
       ownership: {
         responsibleRole: byComp?.['responsible-roles']?.[0]?.['role-id'] ?? '',
         owner: byComp?.['responsible-roles']?.[0]?.remarks ?? '',

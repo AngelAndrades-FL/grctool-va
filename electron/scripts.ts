@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ScriptRunRequest, ScriptRunResult } from '../shared/types.js';
 import { slugifyFileName } from '../shared/ids.js';
-import { writeAttachment } from './storage.js';
+import { writeAttachment } from './attachments.js';
 
 const MAX_SCRIPT_CHARS = 200_000;
 const MAX_CAPTURED_BYTES = 8 * 1024 * 1024;

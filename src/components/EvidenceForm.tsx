@@ -42,6 +42,8 @@ import { validateEvidenceRules } from '@/domain/evidenceSchema';
 import { computeCompleteness, atoMinDate, requiredOdp } from '@/domain/completeness';
 import { useSaveEvidence, useSettings, useAiEvaluate, useAiSuggestOdp, useEvidence, useCatalogIndex } from '@/api/queries';
 import { artifactOwners } from '@/domain/sharedArtifacts';
+import { AzureOverlayPanel } from './AzureOverlayPanel';
+import { AZURE_ORIGINATION, applyAzureFields, isAzureApplied, undoAzureFields } from '@/domain/azureOverlay';
 import { useAppState } from '@/state/AppState';
 import { scoreColour, statusColour } from '@/theme';
 import { RichTextEditor } from './RichTextEditor';
@@ -157,6 +159,22 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
 
   const buildAiRequest = useCallback((): AiEvaluateRequest => {
     const narrative = form.state.values.narrative.implementation.text;
+    if (form.state.values.implementationStatus === 'inherited') {
+      return {
+        controlId: node.id,
+        controlName: node.name,
+        narrative,
+        controlStatement: '',
+        discussion: '',
+        assessmentObjectives: [],
+        objectiveResponses: [],
+        requiredEvidenceTypes: [],
+        providedEvidenceTypes: [],
+        vaOdpValues: [],
+        vaSpecificRequirements: [],
+        inherited: true,
+      };
+    }
     return {
       controlId: node.id,
       controlName: node.name,
@@ -173,11 +191,18 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
         ...form.state.values.artifacts.map((a) => a.evidenceType),
         ...form.state.values.linkedArtifactIds.flatMap((id) => {
           const entry = owners.get(id);
-          return entry && entry.owner !== node.id ? [entry.artifact.evidenceType] : [];
+          return entry && entry.owner !== node.id
+            ? [form.state.values.linkedEvidenceTypes?.[id] || entry.artifact.evidenceType]
+            : [];
         }),
       ],
       vaOdpValues: form.state.values.odpResponses.map((o) => ({ parameter: o.label, value: o.value })),
       vaSpecificRequirements: node.vaOverlay?.va_specific_requirements ?? [],
+      origination: form.state.values.origination,
+      azureOverlay:
+        node.azureOverlay && form.state.values.origination === AZURE_ORIGINATION[node.azureOverlay.ownership]
+          ? node.azureOverlay
+          : undefined,
     };
   }, [form.state.values, node, owners]);
 
@@ -238,6 +263,10 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
 
   const ruleErrors = validateEvidenceRules(form.state.values) ?? {};
   const isNa = useStore(form.store, (state) => state.values.implementationStatus === 'not_applicable');
+  const isInherited = useStore(form.store, (state) => state.values.implementationStatus === 'inherited');
+  const origination = useStore(form.store, (state) => state.values.origination);
+  const priorOrigination = useStore(form.store, (state) => state.values.azurePriorOrigination);
+  const linkedTypes = useStore(form.store, (state) => state.values.linkedEvidenceTypes);
   const responsibleRole = useStore(form.store, (state) => state.values.ownership.responsibleRole);
   const hasEmptyOdp = useStore(form.store, (state) => state.values.odpResponses.some((o) => !o.value.trim()));
 
@@ -288,6 +317,25 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
         <Stack spacing={2}>
+          {node.azureOverlay && (
+            <AzureOverlayPanel
+              overlay={node.azureOverlay}
+              origination={origination}
+              applied={isAzureApplied({ origination, azurePriorOrigination: priorOrigination }, node.azureOverlay)}
+              onApply={() => {
+                const fields = applyAzureFields({ origination, azurePriorOrigination: priorOrigination }, node.azureOverlay!);
+                if (!fields) return;
+                form.setFieldValue('origination', fields.origination);
+                form.setFieldValue('azurePriorOrigination', fields.azurePriorOrigination);
+              }}
+              onUndo={() => {
+                const fields = undoAzureFields({ azurePriorOrigination: priorOrigination });
+                if (!fields) return;
+                form.setFieldValue('origination', fields.origination);
+                form.setFieldValue('azurePriorOrigination', undefined);
+              }}
+            />
+          )}
           <SectionCard title="Status and applicability">
             <form.Field name="implementationStatus">
               {(field) => (
@@ -366,7 +414,11 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
           {!isNa && (
           <SectionCard
             title="Implementation narrative"
-            subtitle="Describe the control as it actually operates — who performs it, using what, how often, and how it is evidenced."
+            subtitle={
+              isInherited
+                ? 'State that this control is inherited, name the source (system, provider and ATO or authorization), and say whether it is fully inherited or hybrid.'
+                : 'Describe the control as it actually operates — who performs it, using what, how often, and how it is evidenced.'
+            }
           >
             <form.Field name="narrative.implementation">
               {(field) => (
@@ -376,11 +428,21 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                   valueJson={field.state.value.json}
                   fallbackText={field.state.value.text}
                   onChange={(json, text) => field.handleChange({ json, text })}
-                  placeholder="The Information System Owner reviews all privileged accounts semi-annually using…"
+                  placeholder={
+                    isInherited
+                      ? 'Inherited from [source system / provider] under [ATO or authorization identifier]…'
+                      : 'The Information System Owner reviews all privileged accounts semi-annually using…'
+                  }
                   minHeight={200}
-                  helperText="Assessors generally expect 60+ words for a substantive control"
+                  helperText={isInherited ? 'Name the source this control is inherited from' : 'Assessors generally expect 60+ words for a substantive control'}
                   template={
-                    node.statementVerbatim || node.statement
+                    isInherited
+                      ? {
+                          label: 'Inheritance statement',
+                          title: 'Load a starting statement — replace each bracketed placeholder with the real source',
+                          text: `${node.id} is fully inherited from [source system or provider name], authorized under [ATO date or FedRAMP / authorization package ID]. [System name] does not implement any part of this control; [describe the inherited capability in one sentence]. [If any part remains with this system, state what it owns and mark the control hybrid instead.]`,
+                        }
+                      : node.statementVerbatim || node.statement
                       ? {
                           label: 'Control statement',
                           title: `Load the ${node.id} control statement as a template — address each element and fill in every [Assignment]`,
@@ -388,7 +450,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                         }
                       : undefined
                   }
-                  actions={[
+                  actions={isInherited ? [] : [
                     {
                       key: 'ai-check',
                       label: 'Check with AI',
@@ -402,6 +464,9 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                           supplementalGuidance: node.supplementalGuidance || node.discussion,
                           statementTemplate: node.statementVerbatim || node.statement,
                           narrative: field.state.value.text,
+                          azureOverlay: node.azureOverlay,
+                          origination,
+                          azureApplied: !!node.azureOverlay && origination === AZURE_ORIGINATION[node.azureOverlay.ownership],
                         }),
                     },
                     {
@@ -434,6 +499,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
           </SectionCard>
           )}
 
+          {!isInherited && (
           <SectionCard
             title="Evidence artifacts"
             subtitle="Attach the proof. Mark an artifact as recurring when it must be re-collected on a cadence; earlier cycles are kept."
@@ -449,8 +515,15 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                   artifacts={field.state.value}
                   linkedArtifacts={linkedIds.flatMap((id) => {
                     const entry = owners.get(id);
-                    return entry && entry.owner !== node.id ? [{ ...entry.artifact, sharedFrom: entry.owner }] : [];
+                    return entry && entry.owner !== node.id
+                      ? [{ ...entry.artifact, evidenceType: linkedTypes?.[id] || entry.artifact.evidenceType, sharedFrom: entry.owner }]
+                      : [];
                   })}
+                  linkedSourceType={(id) => owners.get(id)?.artifact.evidenceType ?? ''}
+                  onLinkedEvidenceTypeChange={(id, evidenceType) => {
+                    const { [id]: _previous, ...rest } = linkedTypes ?? {};
+                    form.setFieldValue('linkedEvidenceTypes', evidenceType ? { ...rest, [id]: evidenceType } : rest);
+                  }}
                   linkCandidates={[...owners.entries()]
                     .filter(([id, entry]) => entry.owner !== node.id && !linkedIds.includes(id))
                     .map(([, entry]) => entry)}
@@ -461,9 +534,13 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
                       .map((r) => r.controlId)
                   }
                   onLink={(ids) => form.setFieldValue('linkedArtifactIds', [...new Set([...linkedIds, ...ids])])}
-                  onUnlink={(id) =>
-                    form.setFieldValue('linkedArtifactIds', linkedIds.filter((x) => x !== id))
-                  }
+                  onUnlink={(id) => {
+                    form.setFieldValue('linkedArtifactIds', linkedIds.filter((x) => x !== id));
+                    if (linkedTypes?.[id]) {
+                      const { [id]: _removed, ...rest } = linkedTypes;
+                      form.setFieldValue('linkedEvidenceTypes', rest);
+                    }
+                  }}
                   onShare={shareArtifact}
                   currentUser={settings?.currentUser ?? ''}
                   suggestRecurring={recurringSuggested}
@@ -496,8 +573,9 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
               )}
             </form.Field>
           </SectionCard>
+          )}
 
-          {!isNa && initial.odpResponses.length > 0 && (
+          {!isNa && !isInherited && initial.odpResponses.length > 0 && (
             <SectionCard
               title="Organization-defined values"
               subtitle="These are the blanks the control leaves to the organization. An assessor will look for each one."
@@ -607,6 +685,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
             </SectionCard>
           )}
 
+          {!isInherited && (
           <SectionCard title="Ownership">
             <Stack direction="row" spacing={2}>
               <form.Field name="ownership.responsibleRole">
@@ -661,8 +740,9 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
               </form.Field>
             </Stack>
           </SectionCard>
+          )}
 
-          {!isNa && (
+          {!isNa && !isInherited && (
           <SectionCard
             title="Dates"
             subtitle="Evidence-as-of drives the staleness warnings and the pre-ATO evidence check."
@@ -794,7 +874,7 @@ export function EvidenceForm({ node, record }: { node: ControlNode; record?: Evi
           </SectionCard>
           )}
 
-          {!isNa && initial.objectiveResponses.length > 0 && (
+          {!isNa && !isInherited && initial.objectiveResponses.length > 0 && (
             <SectionCard
               title="Assessment objectives"
               subtitle="The 800-53A determination statements an assessor tests; every one must be met for the control to pass. Running the AI assessment answers each objective — Met or Not met with an explanation — and fills in this section; those answers drive the AI's rating of this control, and answered objectives count toward its completeness score. Review each answer, correct it where needed, and note where the supporting evidence lives."

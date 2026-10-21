@@ -1,7 +1,6 @@
 /** Workspace persistence: SQLite for the OSCAL SSP + supplemental data, a JSON config file for settings, files for attachments. */
 import { app } from 'electron';
 import Database from 'better-sqlite3';
-import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
@@ -10,8 +9,8 @@ import path from 'node:path';
 import type {
   AiProvider,
   AppSettings,
-  Artifact,
-  AttachmentRenameRequest,
+  AzureOwnership,
+  AzurePolicyRef,
   Catalog,
   EvidenceMap,
   EvidenceRecord,
@@ -26,7 +25,6 @@ import {
   type OscalSsp,
   type SupplementalFile,
 } from '../shared/oscal.js';
-import { buildArtifactFileName, buildAttachmentName, buildPoamFileName, familyOf } from '../shared/ids.js';
 
 const DEFAULT_SETTINGS: AppSettings = {
   systemName: 'Unnamed System',
@@ -262,7 +260,18 @@ export async function restoreConfig(src: string): Promise<AppSettings> {
   return loadSettings();
 }
 
-export async function loadCatalog(): Promise<Catalog> {
+let catalogPromise: Promise<Catalog> | null = null;
+
+/** The bundled catalog is immutable at runtime, so it is read and merged once. */
+export function loadCatalog(): Promise<Catalog> {
+  catalogPromise ??= readCatalog().catch((error: unknown) => {
+    catalogPromise = null;
+    throw error;
+  });
+  return catalogPromise;
+}
+
+async function readCatalog(): Promise<Catalog> {
   const bundled = bundledCatalogFile('800-53.json');
   const catalog = await readJson<Catalog>(bundled);
   if (!catalog?.control_families?.length) {
@@ -282,7 +291,31 @@ export async function loadCatalog(): Promise<Catalog> {
       }
     }
   }
+  const azure = await readJson<AzureOverlayFile>(bundledCatalogFile('azure-overlay.json'));
+  if (azure) {
+    for (const family of catalog.control_families) {
+      for (const control of family.controls) {
+        for (const item of [control, ...(control.control_enhancements ?? [])]) {
+          const id = 'enhancement_id' in item ? item.enhancement_id : control.control_id;
+          const entry = azure.controls[id];
+          if (!entry) continue;
+          item.azure_overlay = {
+            ownership: entry.ownership,
+            policies: entry.policies.flatMap((key) => {
+              const policy = azure.policies[key];
+              return policy ? [{ ...policy, id: key }] : [];
+            }),
+          };
+        }
+      }
+    }
+  }
   return catalog;
+}
+
+interface AzureOverlayFile {
+  controls: Record<string, { ownership: AzureOwnership; policies: string[] }>;
+  policies: Record<string, Omit<AzurePolicyRef, 'id'>>;
 }
 
 interface CsfGuidanceFile {
@@ -367,174 +400,6 @@ export async function deleteEvidence(controlId: string): Promise<void> {
   delete current[controlId];
   const { ssp, supplemental } = recordsToOscal(Object.values(current), settings);
   writeDocs(handle, { [SSP_DOC]: ssp, [SUPPLEMENTAL_DOC]: supplemental });
-}
-
-const MIME_BY_EXT: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.webp': 'image/webp',
-  '.pdf': 'application/pdf',
-  '.txt': 'text/plain',
-  '.log': 'text/plain',
-  '.md': 'text/markdown',
-  '.csv': 'text/csv',
-  '.html': 'text/html',
-  '.xml': 'application/xml',
-  '.json': 'application/json',
-  '.bmp': 'image/bmp',
-  '.ps1': 'text/plain',
-  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-};
-
-/**
- * Copy a picked file into the workspace, renamed to
- * `<CONTROL>__<timestamp>__<original>` and filed under its control family.
- */
-export async function importAttachment(
-  sourcePath: string,
-  controlId: string,
-): Promise<Pick<Artifact, 'filePath' | 'fileName' | 'mimeType' | 'sizeBytes' | 'sha256'>> {
-  const bytes = await fs.readFile(sourcePath);
-  return writeAttachment(bytes, path.basename(sourcePath), controlId);
-}
-
-/** Store bytes the app produced itself (e.g. script output) using the same naming and hashing rules. */
-export async function writeAttachment(
-  bytes: Buffer,
-  originalName: string,
-  controlId: string,
-): Promise<Pick<Artifact, 'filePath' | 'fileName' | 'mimeType' | 'sizeBytes' | 'sha256'>> {
-  const ws = await ensureWorkspace();
-  const family = familyOf(controlId);
-  const targetDir = path.join(ws.attachmentsDir, family);
-  await fs.mkdir(targetDir, { recursive: true });
-
-  const fileName = buildAttachmentName(controlId, originalName, new Date());
-  await fs.writeFile(path.join(targetDir, fileName), bytes);
-
-  return {
-    filePath: path.posix.join('attachments', family, fileName),
-    fileName,
-    mimeType: MIME_BY_EXT[path.extname(originalName).toLowerCase()] ?? 'application/octet-stream',
-    sizeBytes: bytes.byteLength,
-    sha256: createHash('sha256').update(bytes).digest('hex'),
-  };
-}
-
-/** Returns a data URL so the renderer can preview an attachment under a strict CSP. */
-export async function readAttachment(relPath: string): Promise<string | null> {
-  const ws = await ensureWorkspace();
-  const absolute = path.resolve(ws.root, relPath);
-  if (!absolute.startsWith(path.resolve(ws.root))) return null; // no path traversal
-  try {
-    const bytes = await fs.readFile(absolute);
-    const mime = MIME_BY_EXT[path.extname(absolute).toLowerCase()] ?? 'application/octet-stream';
-    return `data:${mime};base64,${bytes.toString('base64')}`;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Rename a stored attachment in place (same family folder) to the artifact naming convention.
- * Appends `-2`, `-3`, … if another file already holds the name.
- */
-export async function renameAttachment(
-  req: AttachmentRenameRequest,
-): Promise<Pick<Artifact, 'filePath' | 'fileName'>> {
-  const ws = await ensureWorkspace();
-  const attachmentsRoot = path.resolve(ws.attachmentsDir);
-  const current = path.resolve(ws.root, req.filePath);
-  const rel = path.relative(attachmentsRoot, current);
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('Attachment is outside the workspace attachments folder.');
-
-  const dir = path.dirname(current);
-  const ext = path.extname(current);
-  const base =
-    req.scheme === 'poam' || req.scheme === 'poam-archive'
-      ? buildPoamFileName({ ...req, extension: ext, archived: req.scheme === 'poam-archive' })
-      : buildArtifactFileName({ ...(req as Extract<AttachmentRenameRequest, { title: string }>), extension: ext });
-  const stem = base.slice(0, base.length - path.extname(base).length);
-  const finalExt = base.slice(stem.length);
-
-  let fileName = base;
-  for (let n = 2; ; n++) {
-    const candidate = path.join(dir, fileName);
-    if (candidate === current) break;
-    try {
-      await fs.access(candidate);
-      fileName = `${stem}-${n}${finalExt}`;
-    } catch {
-      await fs.rename(current, candidate);
-      break;
-    }
-  }
-
-  return {
-    filePath: path.relative(ws.root, path.join(dir, fileName)).split(path.sep).join('/'),
-    fileName,
-  };
-}
-
-/** Delete stored attachments; paths outside the attachments folder and already-missing files are skipped. */
-export async function deleteAttachments(relPaths: string[]): Promise<{ deleted: number }> {
-  const ws = await ensureWorkspace();
-  const attachmentsRoot = path.resolve(ws.attachmentsDir);
-  let deleted = 0;
-  for (const relPath of relPaths) {
-    const absolute = path.resolve(ws.root, relPath);
-    const rel = path.relative(attachmentsRoot, absolute);
-    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) continue;
-    try {
-      await fs.unlink(absolute);
-      deleted++;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    }
-  }
-  return { deleted };
-}
-
-/** Workspace files referenced by an SSP's back-matter, keyed by their relative href; web links are skipped. */
-export async function collectSspAttachments(
-  ssp: OscalSsp,
-): Promise<{ files: Array<{ href: string; absolute: string }>; missing: string[] }> {
-  const ws = await ensureWorkspace();
-  const attachmentsRoot = path.resolve(ws.attachmentsDir);
-  const hrefs = new Set<string>();
-  for (const resource of ssp['system-security-plan']['back-matter']?.resources ?? []) {
-    for (const rlink of resource.rlinks ?? []) {
-      if (!/^[a-z][a-z0-9+.-]*:/i.test(rlink.href) && !rlink.href.startsWith('#')) hrefs.add(rlink.href);
-    }
-  }
-
-  const files: Array<{ href: string; absolute: string }> = [];
-  const missing: string[] = [];
-  for (const href of hrefs) {
-    const absolute = path.resolve(ws.root, href);
-    const rel = path.relative(attachmentsRoot, absolute);
-    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
-      missing.push(href);
-      continue;
-    }
-    try {
-      if ((await fs.stat(absolute)).isFile()) files.push({ href: path.relative(ws.root, absolute).split(path.sep).join('/'), absolute });
-      else missing.push(href);
-    } catch {
-      missing.push(href);
-    }
-  }
-  return { files, missing };
-}
-
-export function resolveInWorkspace(relPath: string): string | null {
-  const ws = workspace();
-  const absolute = path.resolve(ws.root, relPath);
-  return absolute.startsWith(path.resolve(ws.root)) ? absolute : null;
 }
 
 export async function readRawSsp(): Promise<OscalSsp | null> {

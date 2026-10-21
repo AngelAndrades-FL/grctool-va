@@ -46,7 +46,9 @@ export const api = {
   loadSettings: (): Promise<AppSettings> => bridge().loadSettings(),
   saveSettings: (settings: AppSettings): Promise<AppSettings> => bridge().saveSettings(settings),
   addAttachments: (req: AttachmentRequest): Promise<AttachmentResult> => bridge().addAttachments(req),
-  readAttachment: (relPath: string): Promise<string | null> => bridge().readAttachment(relPath),
+  /** URL served by the main process's attachment protocol; usable in <img src> and fetch(). */
+  attachmentUrl: (relPath: string): string =>
+    `grc-attachment://file/${relPath.split('/').map(encodeURIComponent).join('/')}`,
   revealAttachment: (relPath: string): Promise<void> => bridge().revealAttachment(relPath),
   renameAttachment: (req: AttachmentRenameRequest) => bridge().renameAttachment(req),
   deleteAttachments: (relPaths: string[]) => bridge().deleteAttachments(relPaths),
@@ -56,9 +58,6 @@ export const api = {
   aiRelatedDraft: (req: AiRelatedDraftRequest): Promise<AiRelatedDraft> => bridge().aiRelatedDraft(req),
   aiSuggestOdp: (req: AiOdpSuggestRequest): Promise<AiOdpSuggestions> => bridge().aiSuggestOdp(req),
   aiTestConnection: (settings: AiSettings): Promise<AiConnectionTestResult> => bridge().aiTestConnection(settings),
-  aiSignOut: (): Promise<void> => bridge().aiSignOut(),
-  aiSignIn: (settings: AiSettings): Promise<string | null> => bridge().aiSignIn(settings),
-  aiSignedInAccount: (settings: AiSettings): Promise<string | null> => bridge().aiSignedInAccount(settings),
   aiSetApiKey: (apiKey: string): Promise<void> => bridge().aiSetApiKey(apiKey),
   aiClearApiKey: (): Promise<void> => bridge().aiClearApiKey(),
   aiHasApiKey: (): Promise<boolean> => bridge().aiHasApiKey(),

@@ -1,15 +1,13 @@
-import { useEffect, useMemo } from 'react';
-import { Outlet } from '@tanstack/react-router';
+import { useEffect, useMemo, useRef } from 'react';
+import { Outlet, useRouterState } from '@tanstack/react-router';
 import {
   Alert,
   AppBar,
   Box,
-  Button,
   Chip,
   IconButton,
   LinearProgress,
   MenuItem,
-  Snackbar,
   Stack,
   TextField,
   ToggleButton,
@@ -24,6 +22,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import SettingsIcon from '@mui/icons-material/Settings';
 import type { BaselineFilter, FrameworkMode } from '@shared/types';
 import { useAppState } from '@/state/AppState';
+import { titleForPath } from '@/a11y';
 import { useWorkspaceData } from '@/api/queries';
 import { isNodeInBaseline } from '@/domain/catalogIndex';
 import { computeCompleteness, isDocumentedNa } from '@/domain/completeness';
@@ -67,20 +66,59 @@ export function AppShell() {
     };
   }, [index, evidence, baseline, mode]);
 
+  const coverageSummary = `${overall.complete} of ${overall.total} in-baseline controls at 80%+ completeness`;
+
+  // Announce the new page and move focus into it after each client-side navigation.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const mainRef = useRef<HTMLElement>(null);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    document.title = titleForPath(pathname);
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    mainRef.current?.focus();
+  }, [pathname]);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <Box
+        component="a"
+        href="#main-content"
+        onClick={(e: React.MouseEvent) => {
+          e.preventDefault();
+          mainRef.current?.focus();
+        }}
+        sx={{
+          position: 'absolute',
+          left: 8,
+          top: -48,
+          zIndex: (t) => t.zIndex.tooltip + 1,
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          px: 2,
+          py: 1,
+          borderRadius: 1,
+          border: 2,
+          borderColor: 'primary.main',
+          '&:focus': { top: 8 },
+        }}
+      >
+        Skip to main content
+      </Box>
       <AppBar position="static" color="default" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Toolbar variant="dense" sx={{ gap: 2 }}>
           <LinkTypography variant="h6" to="/dashboard" sx={{ textDecoration: 'none', color: 'inherit' }}>
             GRC Evidence Workspace
           </LinkTypography>
 
-          <Stack direction="row" spacing={0.5}>
+          <Stack component="nav" aria-label="Primary" direction="row" spacing={0.5}>
             {NAV.map((item) => (
               <LinkButton
                 key={item.to}
                 to={item.to}
-                activeProps={{ className: 'active' }}
+                activeProps={{ className: 'active', 'aria-current': 'page' }}
                 size="small"
                 sx={{ '&.active': { bgcolor: 'action.selected' } }}
               >
@@ -108,6 +146,7 @@ export function AppShell() {
           <ToggleButtonGroup
             exclusive
             size="small"
+            aria-label="Framework"
             value={mode}
             onChange={(_e, next: FrameworkMode | null) => next && setMode(next)}
           >
@@ -119,8 +158,8 @@ export function AppShell() {
             </ToggleButton>
           </ToggleButtonGroup>
 
-          <Tooltip title={`${overall.complete} of ${overall.total} in-baseline controls at 80%+ completeness`}>
-            <Stack spacing={0.25} sx={{ minWidth: 140 }}>
+          <Box sx={{ minWidth: 140 }} title={coverageSummary}>
+            <Stack spacing={0.25}>
               <Stack direction="row" sx={{ justifyContent: 'space-between' }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                   Coverage
@@ -129,27 +168,33 @@ export function AppShell() {
                   {overall.percent}%
                 </Typography>
               </Stack>
-              <LinearProgress variant="determinate" value={overall.percent} sx={{ height: 5, borderRadius: 2 }} />
+              <LinearProgress
+                variant="determinate"
+                value={overall.percent}
+                aria-label="Coverage"
+                aria-valuetext={coverageSummary}
+                sx={{ height: 5, borderRadius: 2 }}
+              />
             </Stack>
-          </Tooltip>
+          </Box>
 
           <Tooltip title="Search controls (Ctrl+K)">
-            <IconButton onClick={() => setPaletteOpen(true)} size="small">
+            <IconButton onClick={() => setPaletteOpen(true)} size="small" aria-keyshortcuts="Control+K">
               <SearchIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Toggle theme">
+          <Tooltip title={themeMode === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}>
             <IconButton onClick={toggleTheme} size="small">
               {themeMode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
             </IconButton>
           </Tooltip>
           <Tooltip title="Settings">
-            <LinkIconButton to="/settings" activeProps={{ className: 'active' }} size="small">
+            <LinkIconButton to="/settings" activeProps={{ className: 'active', 'aria-current': 'page' }} size="small">
               <SettingsIcon />
             </LinkIconButton>
           </Tooltip>
         </Toolbar>
-        {isLoading && <LinearProgress />}
+        {isLoading && <LinearProgress aria-label="Loading workspace" />}
       </AppBar>
 
       <AtoBanner />
@@ -162,26 +207,34 @@ export function AppShell() {
 
       <Box sx={{ display: 'flex', flexGrow: 1, minHeight: 0 }}>
         <FamilyRail />
-        <Box sx={{ flexGrow: 1, minWidth: 0, overflow: 'auto' }}>
+        <Box
+          component="main"
+          id="main-content"
+          ref={mainRef}
+          tabIndex={-1}
+          sx={{ flexGrow: 1, minWidth: 0, overflow: 'auto', outline: 'none' }}
+        >
           <Outlet />
         </Box>
       </Box>
 
       <CommandPalette />
 
-      {toasts.map((toast, i) => (
-        <Snackbar
-          key={toast.id}
-          open
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          sx={{ mb: i * 7 }}
-          onClose={() => dismissToast(toast.id)}
-        >
-          <Alert severity={toast.severity} variant="filled" onClose={() => dismissToast(toast.id)}>
+      {/* Errors and warnings stay until dismissed; they are not removed on a timer. */}
+      <Stack spacing={1} sx={{ position: 'fixed', right: 16, bottom: 16, zIndex: (t) => t.zIndex.snackbar, maxWidth: 480 }}>
+        {toasts.map((toast) => (
+          <Alert
+            key={toast.id}
+            severity={toast.severity}
+            variant="filled"
+            role={toast.severity === 'error' || toast.severity === 'warning' ? 'alert' : 'status'}
+            onClose={() => dismissToast(toast.id)}
+            slotProps={{ closeButton: { 'aria-label': 'Dismiss notification' } }}
+          >
             {toast.message}
           </Alert>
-        </Snackbar>
-      ))}
+        ))}
+      </Stack>
     </Box>
   );
 }

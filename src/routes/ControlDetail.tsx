@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useParams } from '@tanstack/react-router';
-import { Box, Chip, Divider, Paper, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, Divider, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import { useAppState } from '@/state/AppState';
 import { useWorkspaceData } from '@/api/queries';
 import { isNodeInBaseline } from '@/domain/catalogIndex';

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
   Box,
@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { useAppState } from '@/state/AppState';
+import { visuallyHidden } from '@/a11y';
 import { useWorkspaceData } from '@/api/queries';
 import { isNodeInBaseline, searchNodes } from '@/domain/catalogIndex';
 
@@ -33,6 +34,14 @@ export function CommandPalette() {
 
   const results = useMemo(() => (index ? searchNodes(index, query, 30) : []), [index, query]);
 
+  const listId = useId();
+  const optionId = (i: number) => `${listId}-option-${i}`;
+  const activeId = results[highlight] ? optionId(highlight) : undefined;
+
+  useEffect(() => {
+    if (activeId) document.getElementById(activeId)?.scrollIntoView({ block: 'nearest' });
+  }, [activeId]);
+
   const go = (id: string) => {
     setPaletteOpen(false);
     void navigate({ to: '/control/$controlId', params: { controlId: id } });
@@ -44,6 +53,7 @@ export function CommandPalette() {
       onClose={() => setPaletteOpen(false)}
       fullWidth
       maxWidth="sm"
+      aria-label="Search controls"
       slotProps={{ paper: { sx: { position: 'fixed', top: 80, m: 0 } } }}
     >
       <Box sx={{ p: 1.5 }}>
@@ -69,6 +79,14 @@ export function CommandPalette() {
             }
           }}
           slotProps={{
+            htmlInput: {
+              role: 'combobox',
+              'aria-label': 'Search controls',
+              'aria-autocomplete': 'list',
+              'aria-expanded': results.length > 0,
+              'aria-controls': listId,
+              'aria-activedescendant': activeId,
+            },
             input: {
               startAdornment: (
                 <InputAdornment position="start">
@@ -78,12 +96,23 @@ export function CommandPalette() {
             },
           }}
         />
+        <Box role="status" sx={visuallyHidden}>
+          {query ? `${results.length} ${results.length === 1 ? 'result' : 'results'}` : ''}
+        </Box>
       </Box>
-      <List dense sx={{ maxHeight: 420, overflowY: 'auto', pt: 0 }}>
+      <List id={listId} role="listbox" aria-label="Matching controls" dense sx={{ maxHeight: 420, overflowY: 'auto', pt: 0 }}>
         {results.map((node, i) => {
           const inBaseline = isNodeInBaseline(node, baseline, mode);
           return (
-            <ListItemButton key={node.id} selected={i === highlight} onClick={() => go(node.id)}>
+            <ListItemButton
+              key={node.id}
+              id={optionId(i)}
+              role="option"
+              aria-selected={i === highlight}
+              tabIndex={-1}
+              selected={i === highlight}
+              onClick={() => go(node.id)}
+            >
               <ListItemText
                 primary={
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>

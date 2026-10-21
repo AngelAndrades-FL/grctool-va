@@ -11,6 +11,7 @@ import type {
   CatalogFamily,
   ControlDesignation,
   CrossReference,
+  AzureOverlay,
   EvidenceRequirement,
   FrameworkMode,
   VaOverlay,
@@ -38,6 +39,7 @@ export interface ControlNode {
   parameters: Array<{ parameterId: string; description: string }>;
   evidenceRequired: EvidenceRequirement[];
   vaOverlay?: VaOverlay;
+  azureOverlay?: AzureOverlay;
   relatedControls: string[];
   crossReferences: CrossReference[];
   designation: ControlDesignation;
@@ -88,6 +90,7 @@ function toNode(
     })),
     evidenceRequired: source.evidence_required ?? [],
     vaOverlay: source.va_overlay,
+    azureOverlay: source.azure_overlay,
     relatedControls: control.nist_800_53.related_controls ?? [],
     crossReferences: control.cross_reference_controls ?? [],
     designation: overlay?.control_designation ?? 'system_specific',

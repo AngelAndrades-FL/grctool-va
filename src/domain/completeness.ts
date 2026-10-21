@@ -75,6 +75,7 @@ export function computeCompleteness(node: ControlNode, record?: EvidenceRecord):
   if (record.implementationStatus === 'not_applicable') {
     return record.naJustification.trim().length > 0 ? 100 : 40;
   }
+  if (isInherited(record)) return hasInheritedNarrative(record) ? 100 : 40;
 
   const coverage = evidenceTypeCoverage(node, record);
   const odp = requiredOdp(node);
@@ -93,6 +94,15 @@ export function computeCompleteness(node: ControlNode, record?: EvidenceRecord):
   return Math.round(Math.max(0, Math.min(100, score)));
 }
 
+/** Fully inherited: only the narrative naming the source applies; evidence, values, owners and dates do not. */
+export function isInherited(record?: EvidenceRecord): boolean {
+  return record?.implementationStatus === 'inherited';
+}
+
+function hasInheritedNarrative(record: EvidenceRecord): boolean {
+  return record.narrative.implementation.text.trim().length >= 20;
+}
+
 /** Marked not applicable, with or without a rationale. */
 export function isNotApplicable(record?: EvidenceRecord): boolean {
   return record?.implementationStatus === 'not_applicable';
@@ -105,7 +115,7 @@ export function isDocumentedNa(record?: EvidenceRecord): boolean {
 
 /** Evidence is stale once it predates the last ATO or exceeds the configured age. */
 export function stalenessDays(record: EvidenceRecord | undefined, staleAfterDays: number): number | null {
-  if (isNotApplicable(record)) return null;
+  if (isNotApplicable(record) || isInherited(record)) return null;
   const stamp = record?.dates.evidenceAsOf ?? record?.dates.lastReviewedOn;
   if (!stamp) return null;
   const age = Math.floor(-DateTime.fromISO(stamp).diffNow('days').days);
@@ -113,7 +123,7 @@ export function stalenessDays(record: EvidenceRecord | undefined, staleAfterDays
 }
 
 export function predatesAto(record: EvidenceRecord | undefined, lastAtoDate: string | null): boolean {
-  if (!record || !lastAtoDate || isNotApplicable(record)) return false;
+  if (!record || !lastAtoDate || isNotApplicable(record) || isInherited(record)) return false;
   const stamp = record.dates.evidenceAsOf ?? record.dates.lastReviewedOn;
   if (!stamp) return false;
   return DateTime.fromISO(stamp) < DateTime.fromISO(lastAtoDate);
@@ -144,6 +154,23 @@ export function buildGapReport(
       stale: false,
       staleByDays: null,
       reasons: isDocumentedNa(record) ? [] : ['Rationale for not applicable is missing.'],
+    };
+  }
+  if (record && isInherited(record)) {
+    const missingNarrative = !hasInheritedNarrative(record);
+    return {
+      controlId: node.id,
+      familyId: node.familyId,
+      name: node.name,
+      completeness: computeCompleteness(node, record),
+      missingNarrative,
+      unmappedEvidenceTypes: [],
+      unansweredObjectives: 0,
+      unansweredOdp: [],
+      noArtifacts: false,
+      stale: false,
+      staleByDays: null,
+      reasons: missingNarrative ? ['Narrative does not name the source this control is inherited from.'] : [],
     };
   }
   const coverage = evidenceTypeCoverage(node, record);

@@ -36,19 +36,6 @@ const KINDS: Array<{ value: ArtifactKind; label: string; hint: string }> = [
 ];
 
 function AttachmentPreview({ artifact }: { artifact: Artifact }) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!artifact.filePath) return;
-    let cancelled = false;
-    void api.readAttachment(artifact.filePath).then((result) => {
-      if (!cancelled) setDataUrl(result);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [artifact.filePath]);
-
   if (!artifact.filePath) return null;
   const isImage = (artifact.mimeType ?? '').startsWith('image/');
 
@@ -78,10 +65,10 @@ function AttachmentPreview({ artifact }: { artifact: Artifact }) {
           sha256: {artifact.sha256}
         </Typography>
       )}
-      {isImage && dataUrl && (
+      {isImage && (
         <Box
           component="img"
-          src={dataUrl}
+          src={api.attachmentUrl(artifact.filePath)}
           alt={artifact.title}
           sx={{ maxWidth: '100%', maxHeight: 280, objectFit: 'contain', border: 1, borderColor: 'divider', borderRadius: 1 }}
         />

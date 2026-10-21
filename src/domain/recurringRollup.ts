@@ -34,6 +34,7 @@ export function rollupRecurring(artifacts: Artifact[], dueSoonDays: number): Rec
 }
 
 export interface RecurringRow {
+  /** `<controlId>:<artifactId>`; unique per row. */
   id: string;
   controlId: string;
   familyId: string;
@@ -65,7 +66,8 @@ export function allRecurringRows(evidence: EvidenceMap, settings: AppSettings | 
         ...artifact.recurrence.history.filter((c) => !c.archived).map((c) => `${c.cycleLabel}: ${reference(c)}`),
       ];
       rows.push({
-        id: artifact.id,
+        // A shared artifact appears under every control that links it, so the artifact id alone is not unique.
+        id: `${record.controlId}:${artifact.id}`,
         controlId: record.controlId,
         familyId: record.familyId,
         title: artifact.title,

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
   Alert,
@@ -65,6 +65,15 @@ interface DrillRow {
 }
 
 type DrillKey = 'complete' | 'notApplicable' | 'stale' | 'findings';
+type ReviewBucket = 'overdue' | 'in30' | 'in90' | 'later' | 'unscheduled';
+
+const REVIEW_BUCKETS: Array<{ key: ReviewBucket; label: string }> = [
+  { key: 'overdue', label: 'Overdue' },
+  { key: 'in30', label: 'Next 30 days' },
+  { key: 'in90', label: 'Next 90 days' },
+  { key: 'later', label: 'Later' },
+  { key: 'unscheduled', label: 'Unscheduled' },
+];
 
 const DRILL_TITLE: Record<DrillKey, { title: string; detail: string }> = {
   complete: { title: 'Controls complete', detail: 'Missing evidence' },
@@ -147,6 +156,12 @@ export function Dashboard() {
   const { baseline, mode } = useAppState();
   const [drillKey, setDrillKey] = useState<DrillKey | null>(null);
   const [completeView, setCompleteView] = useState<'complete' | 'incomplete'>('complete');
+  const [reviewBucket, setReviewBucket] = useState<ReviewBucket | null>(null);
+  const reviewPanelRef = useRef<HTMLDivElement>(null);
+  const selectReviewBucket = (key: ReviewBucket) => {
+    setReviewBucket((current) => (current === key ? null : key));
+    requestAnimationFrame(() => reviewPanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  };
   const toggleDrill = (key: DrillKey) => setDrillKey((current) => (current === key ? null : key));
 
   const stats = useMemo(() => {
@@ -167,6 +182,7 @@ export function Dashboard() {
       findings: [] as DrillRow[],
     };
     const reviewBuckets = { overdue: 0, in30: 0, in90: 0, later: 0, unscheduled: 0 };
+    const reviewDrill: Record<ReviewBucket, DrillRow[]> = { overdue: [], in30: [], in90: [], later: [], unscheduled: [] };
 
     let complete = 0;
     let notStarted = 0;
@@ -250,14 +266,15 @@ export function Dashboard() {
       }
 
       const due = record?.dates.nextReviewDue;
-      if (!due) reviewBuckets.unscheduled += 1;
-      else {
+      let bucketKey: ReviewBucket = 'unscheduled';
+      let reviewDetail = 'No next review date';
+      if (due) {
         const days = Math.ceil(DateTime.fromISO(due).diffNow('days').days);
-        if (days < 0) reviewBuckets.overdue += 1;
-        else if (days <= 30) reviewBuckets.in30 += 1;
-        else if (days <= 90) reviewBuckets.in90 += 1;
-        else reviewBuckets.later += 1;
+        bucketKey = days < 0 ? 'overdue' : days <= 30 ? 'in30' : days <= 90 ? 'in90' : 'later';
+        reviewDetail = days < 0 ? `Due ${due} · ${-days} day${days === -1 ? '' : 's'} overdue` : `Due ${due} · in ${days} day${days === 1 ? '' : 's'}`;
       }
+      reviewBuckets[bucketKey] += 1;
+      reviewDrill[bucketKey].push(drillRow(reviewDetail));
     }
 
     const daysToAto = settings?.nextAtoDate
@@ -288,6 +305,7 @@ export function Dashboard() {
         .slice(0, 12),
       missingEvidence: missingEvidence.sort((a, b) => a.completeness - b.completeness),
       reviewBuckets,
+      reviewDrill,
       drill,
     };
   }, [index, evidence, settings, baseline, mode]);
@@ -370,7 +388,7 @@ export function Dashboard() {
   const drillRows: DrillRow[] = drillKey ? (drillKey === 'complete' ? stats.drill[completeView] : stats.drill[drillKey]) : [];
   const drillDetailHeader =
     drillKey === 'complete' ? (completeView === 'complete' ? 'Missing evidence' : 'Gaps') : drillKey ? DRILL_TITLE[drillKey].detail : '';
-  const drillColumns: GridColDef<DrillRow>[] = [
+  const drillColumnsFor = (detailHeader: string): GridColDef<DrillRow>[] => [
     { field: 'id', headerName: 'Control', width: 120 },
     { field: 'familyId', headerName: 'Family', width: 90 },
     { field: 'name', headerName: 'Name', flex: 1, minWidth: 180 },
@@ -396,7 +414,7 @@ export function Dashboard() {
     { field: 'artifacts', headerName: 'Artifacts', width: 85, type: 'number' },
     {
       field: 'detail',
-      headerName: drillDetailHeader,
+      headerName: detailHeader,
       flex: 1.6,
       minWidth: 240,
       sortable: false,
@@ -535,7 +553,7 @@ export function Dashboard() {
                 <Box sx={{ height: 380, mt: 1 }}>
                   <DataGrid<DrillRow>
                     rows={drillRows}
-                    columns={drillColumns}
+                    columns={drillColumnsFor(drillDetailHeader)}
                     showToolbar
                     density="compact"
                     disableRowSelectionOnClick
@@ -620,32 +638,83 @@ export function Dashboard() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
-            <ChartCard title="Review schedule" subtitle="When the next review falls due">
+            <ChartCard title="Review schedule" subtitle="When the next review falls due · select a bar to list the controls">
               <BarChart
                 height={280}
                 layout="horizontal"
+                onItemClick={(_event, item) => {
+                  const bucket = REVIEW_BUCKETS[item.dataIndex ?? -1];
+                  if (bucket) selectReviewBucket(bucket.key);
+                }}
                 yAxis={[
                   {
-                    data: ['Overdue', 'Next 30 days', 'Next 90 days', 'Later', 'Unscheduled'],
+                    data: REVIEW_BUCKETS.map((b) => b.label),
                     scaleType: 'band',
                   },
                 ]}
                 series={[
                   {
-                    data: [
-                      stats.reviewBuckets.overdue,
-                      stats.reviewBuckets.in30,
-                      stats.reviewBuckets.in90,
-                      stats.reviewBuckets.later,
-                      stats.reviewBuckets.unscheduled,
-                    ],
+                    data: REVIEW_BUCKETS.map((b) => stats.reviewBuckets[b.key]),
                     label: 'Controls',
                     color: '#5fa8d3',
                   },
                 ]}
               />
+              <Stack direction="row" role="group" aria-label="Review schedule buckets" sx={{ flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                {REVIEW_BUCKETS.map((b) => (
+                  <Chip
+                    key={b.key}
+                    size="small"
+                    component="button"
+                    clickable
+                    aria-pressed={reviewBucket === b.key}
+                    color={reviewBucket === b.key ? 'primary' : 'default'}
+                    variant={reviewBucket === b.key ? 'filled' : 'outlined'}
+                    label={`${b.label}: ${stats.reviewBuckets[b.key]}`}
+                    onClick={() => selectReviewBucket(b.key)}
+                  />
+                ))}
+              </Stack>
             </ChartCard>
           </Grid>
+
+          {reviewBucket && (
+            <Grid size={12}>
+              <Paper variant="outlined" sx={{ p: 2 }} ref={reviewPanelRef}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="subtitle2" component="h2">
+                      Review schedule · {REVIEW_BUCKETS.find((b) => b.key === reviewBucket)?.label} ·{' '}
+                      {stats.reviewDrill[reviewBucket].length} control{stats.reviewDrill[reviewBucket].length === 1 ? '' : 's'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Select a row to open the control.
+                    </Typography>
+                  </Box>
+                  <Tooltip title="Close">
+                    <IconButton size="small" onClick={() => setReviewBucket(null)} aria-label="Close review schedule list">
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+                <Box sx={{ height: 380, mt: 1 }}>
+                  <DataGrid<DrillRow>
+                    rows={stats.reviewDrill[reviewBucket]}
+                    columns={drillColumnsFor('Next review')}
+                    showToolbar
+                    density="compact"
+                    disableRowSelectionOnClick
+                    onRowClick={(params: GridRowParams<DrillRow>) =>
+                      void navigate({ to: '/control/$controlId', params: { controlId: params.row.id } })
+                    }
+                    initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                    pageSizeOptions={[10, 25, 50]}
+                    sx={{ border: 0, '& .MuiDataGrid-row': { cursor: 'pointer' } }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+          )}
 
           <Grid size={12}>
             <Paper variant="outlined" sx={{ p: 2 }}>

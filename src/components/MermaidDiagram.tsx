@@ -65,21 +65,32 @@ export function MermaidDiagram({ code, minHeight = 120 }: { code: string; minHei
   }
 
   return (
-    <Box
-      sx={{
-        minHeight,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: 1,
-        p: 1,
-        overflow: 'auto',
-        '& svg': { maxWidth: '100%', height: 'auto' },
-      }}
-      // Mermaid output is generated locally from user-authored source and rendered with securityLevel 'strict'.
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <Box>
+      <Box
+        role="img"
+        aria-label="Diagram. Its source is available below."
+        sx={{
+          minHeight,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: 1,
+          borderColor: 'divider',
+          borderRadius: 1,
+          p: 1,
+          overflow: 'auto',
+          '& svg': { maxWidth: '100%', height: 'auto' },
+        }}
+        // Mermaid output is generated locally from user-authored source and rendered with securityLevel 'strict'.
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      {/* Text alternative for the diagram. */}
+      <Box component="details" sx={{ mt: 0.5, fontSize: 12 }}>
+        <summary>Diagram source</summary>
+        <Box component="pre" tabIndex={0} sx={{ overflow: 'auto', m: 0, p: 1, bgcolor: 'action.hover' }}>
+          {code}
+        </Box>
+      </Box>
+    </Box>
   );
 }

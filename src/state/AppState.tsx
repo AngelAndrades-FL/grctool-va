@@ -14,6 +14,7 @@ import {
 } from 'react';
 import type { BaselineFilter, FrameworkMode, ImplementationStatus } from '@shared/types';
 import { useSaveSettings, useSettings } from '@/api/queries';
+import type { AzureFilter } from '@/domain/azureOverlay';
 
 export interface ListFilters {
   statuses: ImplementationStatus[];
@@ -24,6 +25,8 @@ export interface ListFilters {
   onlyStale: boolean;
   showOutOfBaseline: boolean;
   showWithdrawn: boolean;
+  /** Azure Policy overlay filter; 'all' leaves it off. */
+  azure: AzureFilter;
 }
 
 const EMPTY_FILTERS: ListFilters = {
@@ -35,6 +38,7 @@ const EMPTY_FILTERS: ListFilters = {
   onlyStale: false,
   showOutOfBaseline: false,
   showWithdrawn: false,
+  azure: 'all',
 };
 
 export interface Toast {
@@ -102,7 +106,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     toastId += 1;
     const toast = { id: toastId, message, severity };
     setToasts((current) => [...current, toast]);
-    setTimeout(() => setToasts((current) => current.filter((t) => t.id !== toast.id)), 5000);
+    // Errors and warnings stay until dismissed so they can be read at any pace.
+    if (severity === 'error' || severity === 'warning') return;
+    setTimeout(() => setToasts((current) => current.filter((t) => t.id !== toast.id)), 8000);
   }, []);
 
   const value = useMemo<AppStateValue>(

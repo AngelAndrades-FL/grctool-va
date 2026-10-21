@@ -35,26 +35,37 @@ import { RecurrenceSection } from './RecurrenceSection';
 
 const MAX_PREVIEW_CHARS = 20_000;
 
+/** Enough bytes for the text preview; the file itself is streamed from disk and may be far larger. */
+const MAX_PREVIEW_BYTES = MAX_PREVIEW_CHARS * 4;
+
 /** Shows the evidence file as saved, so file-based output ($env:GRC_OUTPUT_FILE, images) is visible too. */
 function EvidencePreview({ filePath, mimeType, label }: { filePath: string; mimeType?: string; label: string }) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const url = api.attachmentUrl(filePath);
+  const [state, setState] = useState<{ loading: boolean; mime: string; text: string; failed: boolean }>({
+    loading: true,
+    mime: mimeType ?? '',
+    text: '',
+    failed: false,
+  });
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    void api.readAttachment(filePath).then((url) => {
-      if (cancelled) return;
-      setDataUrl(url);
-      setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [filePath]);
+    const controller = new AbortController();
+    setState({ loading: true, mime: mimeType ?? '', text: '', failed: false });
+    fetch(url, { headers: { Range: `bytes=0-${MAX_PREVIEW_BYTES - 1}` }, signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const mime = mimeType ?? response.headers.get('Content-Type') ?? '';
+        const text = mime.startsWith('image/') ? '' : await response.text();
+        setState({ loading: false, mime, text, failed: false });
+      })
+      .catch((error: unknown) => {
+        if ((error as Error).name !== 'AbortError') setState((s) => ({ ...s, loading: false, failed: true }));
+      });
+    return () => controller.abort();
+  }, [url, mimeType]);
 
-  if (loading) return <CircularProgress size={16} />;
-  if (!dataUrl) {
+  if (state.loading) return <CircularProgress size={16} aria-label="Loading preview" />;
+  if (state.failed) {
     return (
       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
         The evidence file could not be read.
@@ -62,8 +73,7 @@ function EvidencePreview({ filePath, mimeType, label }: { filePath: string; mime
     );
   }
 
-  const mime = mimeType ?? dataUrl.slice(5, dataUrl.indexOf(';'));
-  if (mime.startsWith('image/')) {
+  if (state.mime.startsWith('image/')) {
     return (
       <Stack spacing={0.5}>
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -71,7 +81,7 @@ function EvidencePreview({ filePath, mimeType, label }: { filePath: string; mime
         </Typography>
         <Box
           component="img"
-          src={dataUrl}
+          src={url}
           alt={label}
           sx={{ maxWidth: '100%', maxHeight: 320, objectFit: 'contain', border: 1, borderColor: 'divider', borderRadius: 1 }}
         />
@@ -79,8 +89,7 @@ function EvidencePreview({ filePath, mimeType, label }: { filePath: string; mime
     );
   }
 
-  const bytes = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
-  const text = new TextDecoder().decode(bytes);
+  const { text } = state;
   return (
     <TextField
       fullWidth

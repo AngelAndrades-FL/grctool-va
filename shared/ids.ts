@@ -35,7 +35,7 @@ export function idToFileToken(controlId: string): string {
 }
 
 export function slugifyFileName(name: string): string {
-  return name.replace(/[^\w.\-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return name.replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
 /** `AC-2_1__20260924T1530__network-diagram.png` */

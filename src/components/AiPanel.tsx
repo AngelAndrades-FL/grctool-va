@@ -40,7 +40,6 @@ function VerdictChip({ verdict }: { verdict: string }) {
 }
 
 function ObjectiveRow({ objective }: { objective: ObjectiveCoverage }) {
-  const [expanded, setExpanded] = useState(false);
   const covered = objective.covered;
   return (
     <Box key={objective.objective} sx={{ mb: 1.5, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>

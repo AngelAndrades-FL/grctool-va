@@ -9,17 +9,18 @@
     "dev": "vite",
     "build": "tsc --build && vite build",
     "typecheck": "tsc --build",
+    "lint": "oxlint .",
+    "test": "vitest run",
     "check:baseline": "node scripts/check-baseline.mjs",
     "catalog:csf": "node --use-system-ca scripts/fetch-csf-guidance.mjs",
+    "catalog:azure": "node --use-system-ca scripts/fetch-azure-overlay.mjs",
     "check:roundtrip": "rolldown scripts/check-roundtrip.ts --platform node --format esm --file node_modules/.tmp/check-roundtrip.mjs && node node_modules/.tmp/check-roundtrip.mjs",
     "check:sop": "rolldown scripts/check-sop.ts --platform node --format esm --file node_modules/.tmp/check-sop.mjs && node node_modules/.tmp/check-sop.mjs",
-    "check": "npm run typecheck && npm run check:baseline && npm run check:roundtrip && npm run check:sop",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run check:baseline && npm run check:roundtrip && npm run check:sop",
     "preview": "vite preview",
     "package": "npm run build && electron-builder"
   },
   "dependencies": {
-    "@azure/msal-node": "^7.0.0",
-    "@azure/openai": "^2.0.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@lexical/list": "^0.51.0",
@@ -59,13 +60,19 @@
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
+    "oxlint": "^1.89.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
-    "vite-plugin-electron": "^1.1.2"
+    "vite-plugin-electron": "^1.1.2",
+    "vitest": "^5.0.5"
   },
   "build": {
     "appId": "gov.va.grctool",
     "productName": "GRC Evidence Workspace",
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**",
       "dist-electron/**"

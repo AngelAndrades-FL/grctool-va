@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -15,14 +15,17 @@ import {
   INSERT_UNORDERED_LIST_COMMAND,
   REMOVE_LIST_COMMAND,
 } from '@lexical/list';
+import { $getNearestNodeOfType } from '@lexical/utils';
 import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $getSelection,
+  $isRangeSelection,
   FORMAT_TEXT_COMMAND,
   type EditorState,
 } from 'lexical';
-import { Box, Divider, Stack, ToggleButton, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, Button, Divider, Stack, ToggleButton, Tooltip, Typography, useTheme } from '@mui/material';
 import FormatBoldIcon from '@mui/icons-material/FormatBold';
 import FormatItalicIcon from '@mui/icons-material/FormatItalic';
 import FormatUnderlinedIcon from '@mui/icons-material/FormatUnderlined';
@@ -55,7 +58,40 @@ export interface EditorAction {
 
 function Toolbar({ template, actions = [] }: { template?: EditorTemplate; actions?: EditorAction[] }) {
   const [editor] = useLexicalComposerContext();
+  const [active, setActive] = useState<Set<string>>(new Set());
 
+  // Mirror the selection's formatting so each button reports whether it is on.
+  useEffect(
+    () =>
+      editor.registerUpdateListener(({ editorState }) => {
+        editorState.read(() => {
+          const next = new Set<string>();
+          const selection = $getSelection();
+          if ($isRangeSelection(selection)) {
+            for (const format of ['bold', 'italic', 'underline'] as const) {
+              if (selection.hasFormat(format)) next.add(format);
+            }
+            const list = $getNearestNodeOfType(selection.anchor.getNode(), ListNode);
+            if (list) next.add(list.getListType() === 'number' ? 'ol' : 'ul');
+          }
+          setActive((prev) => (prev.size === next.size && [...next].every((k) => prev.has(k)) ? prev : next));
+        });
+      }),
+    [editor],
+  );
+
+  // Arrow keys, Home and End move between toolbar buttons, as the ARIA toolbar pattern expects.
+  const onToolbarKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    if (!keys.includes(e.key)) return;
+    const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+    const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (i === -1) return;
+    e.preventDefault();
+    const next =
+      e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next].focus();
+  };
   const loadTemplate = () => {
     if (!template) return;
     const hasContent = editor.getEditorState().read(() => $getRoot().getTextContent().trim().length > 0);
@@ -85,12 +121,21 @@ function Toolbar({ template, actions = [] }: { template?: EditorTemplate; action
   ];
 
   return (
-    <Stack direction="row" spacing={0.25} sx={{ px: 0.5, py: 0.25, flexWrap: 'wrap' }}>
+    <Stack
+      direction="row"
+      spacing={0.25}
+      role="toolbar"
+      aria-label="Text formatting"
+      onKeyDown={onToolbarKeyDown}
+      sx={{ px: 0.5, py: 0.25, flexWrap: 'wrap' }}
+    >
       {buttons.map((b) => (
         <Tooltip key={b.key} title={b.title}>
           <ToggleButton
             value={b.key}
             size="small"
+            selected={active.has(b.key)}
+            aria-label={b.title}
             sx={{ border: 0, px: 0.75, py: 0.25 }}
             onMouseDown={(e) => e.preventDefault()}
             onClick={b.run}
@@ -103,33 +148,31 @@ function Toolbar({ template, actions = [] }: { template?: EditorTemplate; action
         <>
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
           <Tooltip title={template.title}>
-            <ToggleButton
-              value="template"
+            <Button
               size="small"
-              sx={{ border: 0, px: 0.75, py: 0.25, gap: 0.5, textTransform: 'none', fontSize: 12 }}
+              startIcon={<PostAddIcon fontSize="small" />}
+              sx={{ px: 0.75, py: 0.25, textTransform: 'none', fontSize: 12 }}
               onMouseDown={(e) => e.preventDefault()}
               onClick={loadTemplate}
             >
-              <PostAddIcon fontSize="small" />
               {template.label}
-            </ToggleButton>
+            </Button>
           </Tooltip>
         </>
       )}
       {actions.map((action) => (
         <Tooltip key={action.key} title={action.title}>
           <span>
-            <ToggleButton
-              value={action.key}
+            <Button
               size="small"
               disabled={action.disabled}
-              sx={{ border: 0, px: 0.75, py: 0.25, gap: 0.5, textTransform: 'none', fontSize: 12 }}
+              startIcon={action.icon}
+              sx={{ px: 0.75, py: 0.25, textTransform: 'none', fontSize: 12 }}
               onMouseDown={(e) => e.preventDefault()}
               onClick={action.onClick}
             >
-              {action.icon}
               {action.label}
-            </ToggleButton>
+            </Button>
           </span>
         </Tooltip>
       ))}
@@ -213,7 +256,7 @@ export function RichTextEditor({
             position: 'absolute',
             top: 12,
             left: 12,
-            color: theme.palette.text.disabled,
+            color: theme.palette.text.secondary,
             pointerEvents: 'none',
             fontSize: 14,
           },
@@ -235,6 +278,7 @@ export function RichTextEditor({
               contentEditable={
                 <ContentEditable
                   className="lex-editable"
+                  aria-label={label ?? placeholder ?? 'Rich text editor'}
                   aria-placeholder={placeholder ?? ''}
                   placeholder={<div className="lex-placeholder">{placeholder ?? ''}</div>}
                 />

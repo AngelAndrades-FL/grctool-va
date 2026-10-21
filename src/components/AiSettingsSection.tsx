@@ -13,7 +13,6 @@ import {
   Typography,
 } from '@mui/material';
 import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
-import LoginIcon from '@mui/icons-material/Login';
 import KeyIcon from '@mui/icons-material/Key';
 import type { AiConnectionTestResult, AiSettings } from '@shared/types';
 import { api } from '@/api/client';
@@ -23,16 +22,11 @@ export interface AiSettingsSectionProps {
   onChange: (value: AiSettings) => void;
 }
 
-/** AI provider connection parameters (Azure OpenAI with Entra sign-in, or OpenAI via TanStack AI) and a live connection test. */
+/** AI provider connection parameters (Azure OpenAI or OpenAI, API key, via TanStack AI) and a live connection test. */
 export function AiSettingsSection({ value, onChange }: AiSettingsSectionProps) {
   const patch = (update: Partial<AiSettings>) => onChange({ ...value, ...update });
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<AiConnectionTestResult | null>(null);
-  const [account, setAccount] = useState<string | null>(null);
-  const [signingIn, setSigningIn] = useState(false);
-  const [signInError, setSignInError] = useState<string | null>(null);
-
-  const azure = value.provider === 'azure-openai';
   const openai = value.provider === 'tanstack-openai';
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -59,44 +53,11 @@ export function AiSettingsSection({ value, onChange }: AiSettingsSectionProps) {
     setResult(null);
   };
 
-  useEffect(() => {
-    if (!azure || !value.clientId.trim()) {
-      setAccount(null);
-      return;
-    }
-    void api.aiSignedInAccount(value).then(setAccount);
-  }, [azure, value.clientId, value.tenantId, value.cloud]);
-
-  const signIn = async () => {
-    setSigningIn(true);
-    setSignInError(null);
-    try {
-      setAccount(await api.aiSignIn(value));
-    } catch (err) {
-      setSignInError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSigningIn(false);
-    }
-  };
-
-  const signOut = async () => {
-    await api.aiSignOut();
-    setAccount(null);
-    setResult(null);
-  };
-
-  /** The cloud (and so the sign-in authority) follows the endpoint host. */
-  const changeEndpoint = (endpoint: string) => {
-    const host = /^https?:\/\/([^/:]+)/i.exec(endpoint.trim())?.[1]?.toLowerCase() ?? '';
-    patch({ endpoint, cloud: host.endsWith('.us') ? 'government' : 'commercial' });
-  };
-
   const test = async () => {
     setTesting(true);
     setResult(null);
     try {
       setResult(await api.aiTestConnection(value));
-      if (azure && value.clientId.trim()) setAccount(await api.aiSignedInAccount(value));
     } finally {
       setTesting(false);
     }
@@ -231,84 +192,7 @@ export function AiSettingsSection({ value, onChange }: AiSettingsSectionProps) {
           </>
         )}
 
-        {azure && (
-          <>
-            <TextField
-              size="small"
-              fullWidth
-              label="Endpoint"
-              placeholder="https://my-gateway.azure-api.us/api"
-              value={value.endpoint}
-              onChange={(e) => changeEndpoint(e.target.value)}
-            />
-
-            <Stack direction="row" spacing={2}>
-              <TextField
-                size="small"
-                fullWidth
-                label="Deployment name"
-                placeholder="e.g. gpt-4o-mini"
-                value={value.deployment}
-                onChange={(e) => patch({ deployment: e.target.value })}
-              />
-              <TextField
-                size="small"
-                label="API version"
-                sx={{ minWidth: 200 }}
-                value={value.apiVersion}
-                onChange={(e) => patch({ apiVersion: e.target.value })}
-              />
-            </Stack>
-
-            <Stack direction="row" spacing={2}>
-              <TextField
-                size="small"
-                fullWidth
-                label="Tenant ID"
-                value={value.tenantId}
-                onChange={(e) => patch({ tenantId: e.target.value })}
-              />
-              <TextField
-                size="small"
-                fullWidth
-                label="Application (client) ID"
-                value={value.clientId}
-                onChange={(e) => patch({ clientId: e.target.value })}
-              />
-            </Stack>
-
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-              <Chip
-                size="small"
-                color={account ? 'success' : 'default'}
-                label={account ? `Signed in as ${account}` : 'Not signed in'}
-                sx={{ height: 22, fontSize: 11 }}
-              />
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={signingIn ? <CircularProgress size={14} /> : <LoginIcon />}
-                disabled={signingIn || !value.clientId.trim()}
-                onClick={() => void signIn()}
-              >
-                {account ? 'Switch account' : 'Sign in'}
-              </Button>
-              {account && (
-                <Button size="small" onClick={() => void signOut()}>
-                  Sign out
-                </Button>
-              )}
-            </Stack>
-            {signingIn && (
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                Complete the sign-in in your browser, then return here.
-              </Typography>
-            )}
-            {signInError && <Alert severity="error" sx={{ py: 0 }}>{signInError}</Alert>}
-          </>
-        )}
-
-        {(azure || openai) && (
+        {openai && (
           <>
             <TextField
               size="small"

@@ -84,6 +84,10 @@ export interface ArtifactsPanelProps {
   linkedBy?: (artifactId: string) => string[];
   onLink?: (artifactIds: string[]) => void;
   onUnlink?: (artifactId: string) => void;
+  /** The owning control's evidence type for a linked artifact. */
+  linkedSourceType?: (artifactId: string) => string;
+  /** Set this control's evidence type for a linked artifact; null reverts to the owner's type. */
+  onLinkedEvidenceTypeChange?: (artifactId: string, evidenceType: string | null) => void;
   onShare?: (artifactId: string, controlIds: string[]) => void;
   currentUser: string;
   /** The control's text reads like evidence must be re-collected on a cadence. */
@@ -102,6 +106,8 @@ export function ArtifactsPanel({
   linkedBy,
   onLink,
   onUnlink,
+  linkedSourceType,
+  onLinkedEvidenceTypeChange,
   onShare,
   currentUser,
   suggestRecurring = false,
@@ -200,7 +206,38 @@ export function ArtifactsPanel({
         </Stack>
       ),
     },
-    { field: 'evidenceType', headerName: 'Evidence type', width: 170 },
+    {
+      field: 'evidenceType',
+      headerName: 'Evidence type',
+      width: 190,
+      renderCell: (params) => {
+        const row = params.row;
+        if (!row.sharedFrom || !onLinkedEvidenceTypeChange) return row.evidenceType;
+        const source = linkedSourceType?.(row.id) || row.evidenceType;
+        const options = [...new Set([source, ...evidenceRequired.map((r) => r.evidence_type), row.evidenceType])];
+        return (
+          <Tooltip title={`Evidence type for ${controlId}; ${row.sharedFrom} files it as ${source}`} placement="left">
+            <TextField
+              select
+              size="small"
+              variant="standard"
+              value={row.evidenceType}
+              onChange={(e) => onLinkedEvidenceTypeChange(row.id, e.target.value === source ? null : e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              slotProps={{ input: { disableUnderline: true, sx: { fontSize: 14 } } }}
+              sx={{ width: '100%', mt: 0.75 }}
+            >
+              {options.map((type) => (
+                <MenuItem key={type} value={type}>
+                  {type}
+                  {type === source ? ` (${row.sharedFrom})` : ''}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Tooltip>
+        );
+      },
+    },
     {
       field: 'recurrence',
       headerName: 'Recurrence',
@@ -420,7 +457,7 @@ export function ArtifactsPanel({
               <TextField
                 {...params}
                 label="Artifacts from other controls"
-                helperText="A linked artifact counts toward this control's evidence types when its type matches."
+                helperText="After linking, you can set the evidence type this control uses for each linked artifact."
               />
             )}
           />

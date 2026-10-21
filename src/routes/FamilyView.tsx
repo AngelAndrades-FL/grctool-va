@@ -2,25 +2,31 @@ import { useMemo } from 'react';
 import { useNavigate, useParams } from '@tanstack/react-router';
 import {
   Box,
+  Button,
   Chip,
   LinearProgress,
+  MenuItem,
   Paper,
   Stack,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material';
 import { DataGrid, type GridColDef, type GridRowParams } from '@mui/x-data-grid';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { DateTime } from 'luxon';
 import { useAppState } from '@/state/AppState';
-import { useWorkspaceData } from '@/api/queries';
+import { useWorkspaceData, useSaveEvidence } from '@/api/queries';
 import { FilterSwitch } from '@/components/FilterSwitch';
 import { isNodeInBaseline, type ControlNode } from '@/domain/catalogIndex';
 import { baselineLabel, overlayDivergence } from '@/domain/baseline';
 import { buildGapReport, computeCompleteness, isNotApplicable } from '@/domain/completeness';
+import { AZURE_LABEL, applyAzureOverlay, matchesAzureFilter, undoAzureOverlay, type AzureFilter } from '@/domain/azureOverlay';
+import { seedRecord } from '@/domain/records';
 import { rollupRecurring } from '@/domain/recurringRollup';
 import { STATUS_LABEL as RECURRING_STATUS_LABEL, statusSeverity } from '@shared/recurring';
 import { scoreColour, statusColour } from '@/theme';
-import type { ImplementationStatus, RecurringStatus } from '@shared/types';
+import type { AzureOwnership, ImplementationStatus, RecurringStatus } from '@shared/types';
 
 const STATUS_LABEL: Record<ImplementationStatus, string> = {
   not_started: 'Not started',
@@ -41,6 +47,8 @@ interface Row {
   divergent: boolean;
   priority: string;
   designation: string;
+  azure: AzureOwnership | null;
+  azurePolicies: number;
   status: ImplementationStatus;
   completeness: number;
   notApplicable: boolean;
@@ -59,7 +67,8 @@ export function FamilyView() {
   const { familyId } = useParams({ from: '/family/$familyId' });
   const navigate = useNavigate();
   const { index, evidence, settings } = useWorkspaceData();
-  const { baseline, mode, filters, setFilters } = useAppState();
+  const { baseline, mode, filters, setFilters, notify } = useAppState();
+  const saveEvidence = useSaveEvidence();
 
   const family = index?.familyById.get(familyId);
 
@@ -70,6 +79,7 @@ export function FamilyView() {
     return nodes
       .filter((node) => filters.showWithdrawn || node.status === 'active')
       .filter((node) => filters.showOutOfBaseline || isNodeInBaseline(node, baseline, mode))
+      .filter((node) => matchesAzureFilter(node.azureOverlay, filters.azure))
       .map((node) => {
         const record = evidence[node.id];
         const gaps = buildGapReport(node, record, {
@@ -87,6 +97,8 @@ export function FamilyView() {
           divergent: overlayDivergence(node.control).length > 0,
           priority: node.priorityCode,
           designation: node.designation.replace(/_/g, ' '),
+          azure: node.azureOverlay?.ownership ?? null,
+          azurePolicies: node.azureOverlay?.policies.length ?? 0,
           status: record?.implementationStatus ?? 'not_started',
           completeness: computeCompleteness(node, record),
           notApplicable: isNotApplicable(record),
@@ -147,6 +159,17 @@ export function FamilyView() {
       { field: 'baseline', headerName: 'Baseline', width: 90 },
       { field: 'priority', headerName: 'Priority', width: 80 },
       { field: 'designation', headerName: 'Origination', width: 130 },
+      {
+        field: 'azure',
+        headerName: 'Azure',
+        width: 110,
+        renderCell: (params) =>
+          params.row.azure ? (
+            <Tooltip title={`${params.row.azurePolicies} Azure Policy definition(s) mapped`}>
+              <Chip label={AZURE_LABEL[params.row.azure]} size="small" variant="outlined" sx={{ height: 20, fontSize: 11 }} />
+            </Tooltip>
+          ) : null,
+      },
       {
         field: 'status',
         headerName: 'Status',
@@ -257,6 +280,36 @@ export function FamilyView() {
     [],
   );
 
+  const applicable = useMemo(
+    () =>
+      rows.flatMap((row) => {
+        const node = index?.nodeById.get(row.id);
+        if (!node?.azureOverlay) return [];
+        const updated = applyAzureOverlay(seedRecord(node, evidence[node.id]), node.azureOverlay);
+        return updated ? [updated] : [];
+      }),
+    [rows, index, evidence],
+  );
+
+  const undoable = useMemo(
+    () =>
+      rows.flatMap((row) => {
+        const node = index?.nodeById.get(row.id);
+        const record = evidence[row.id];
+        if (!node?.azureOverlay || !record) return [];
+        const reverted = undoAzureOverlay(seedRecord(node, record), node.azureOverlay);
+        return reverted ? [reverted] : [];
+      }),
+    [rows, index, evidence],
+  );
+
+  const applyToListed = () => {
+    saveEvidence.mutate(applicable, {
+      onSuccess: () => notify(`Azure overlay applied to ${applicable.length} control(s)`, 'success'),
+      onError: (error) => notify(error instanceof Error ? error.message : 'Apply failed', 'error'),
+    });
+  };
+
   if (!family) {
     return (
       <Box sx={{ p: 4 }}>
@@ -295,6 +348,42 @@ export function FamilyView() {
             onChange={(v) => setFilters({ onlyGaps: v })}
             help="Narrows the list to controls that still need work — a missing or thin narrative, no evidence artifacts, unanswered assessment objectives, blank organization-defined parameter values, or stale dates. Controls that are fully documented drop out of the list. Use the Gap report for the same view across every family at once."
           />
+          <Stack direction="row" spacing={0.5} sx={{ mt: 1, alignItems: 'center' }}>
+            <TextField
+              select
+              size="small"
+              label="Azure overlay"
+              value={filters.azure}
+              onChange={(e) => setFilters({ azure: e.target.value as AzureFilter })}
+              sx={{ minWidth: 190 }}
+            >
+              <MenuItem value="all">All controls</MenuItem>
+              <MenuItem value="shared">Shared</MenuItem>
+              <MenuItem value="customer">Customer</MenuItem>
+              <MenuItem value="none">Not in overlay</MenuItem>
+            </TextField>
+            <Tooltip title="Optional overlay from Microsoft's Azure Policy mapping for NIST 800-53 Rev 5. Shared: Microsoft and the customer each own part. Customer: the customer owns it. The Azure column shows the mapping, and Apply sets each listed control's origination to match.">
+              <InfoOutlinedIcon sx={{ fontSize: 15, color: 'text.secondary' }} />
+            </Tooltip>
+          </Stack>
+          <Button size="small" sx={{ mt: 0.5 }} disabled={applicable.length === 0} onClick={applyToListed}>
+            Apply Azure overlay to {applicable.length} listed
+          </Button>
+          {undoable.length > 0 && (
+            <Button
+              size="small"
+              color="warning"
+              sx={{ mt: 0.5 }}
+              onClick={() =>
+                saveEvidence.mutate(undoable, {
+                  onSuccess: () => notify(`Azure overlay undone on ${undoable.length} control(s)`, 'success'),
+                  onError: (error) => notify(error instanceof Error ? error.message : 'Undo failed', 'error'),
+                })
+              }
+            >
+              Undo Azure overlay on {undoable.length} listed
+            </Button>
+          )}
         </Stack>
       </Stack>
 

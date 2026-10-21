@@ -16,7 +16,9 @@ export function resolveSharedArtifacts(evidence: EvidenceMap): EvidenceMap {
   for (const [id, record] of Object.entries(evidence)) {
     const linked = (record.linkedArtifactIds ?? []).flatMap((artifactId) => {
       const entry = owners.get(artifactId);
-      return entry && entry.owner !== record.controlId ? [{ ...entry.artifact, sharedFrom: entry.owner }] : [];
+      return entry && entry.owner !== record.controlId
+        ? [{ ...entry.artifact, evidenceType: record.linkedEvidenceTypes?.[artifactId] || entry.artifact.evidenceType, sharedFrom: entry.owner }]
+        : [];
     });
     resolved[id] = linked.length ? { ...record, artifacts: [...record.artifacts, ...linked] } : record;
   }

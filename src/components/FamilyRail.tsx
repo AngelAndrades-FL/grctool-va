@@ -47,7 +47,11 @@ export function FamilyRail() {
   }, [index, evidence, baseline, mode]);
 
   return (
-    <Box sx={{ width: 268, flexShrink: 0, borderRight: 1, borderColor: 'divider', overflowY: 'auto' }}>
+    <Box
+      component="nav"
+      aria-label="Control families"
+      sx={{ width: 268, flexShrink: 0, borderRight: 1, borderColor: 'divider', overflowY: 'auto' }}
+    >
       <Stack spacing={0.5} sx={{ px: 2, pt: 2, pb: 1 }}>
         <Typography variant="overline" sx={{ color: 'text.secondary' }}>
           Control families
@@ -65,6 +69,7 @@ export function FamilyRail() {
             to="/family/$familyId"
             params={{ familyId: stat.id }}
             selected={familyId === stat.id}
+            aria-current={familyId === stat.id ? 'page' : undefined}
             sx={{ alignItems: 'flex-start', py: 1 }}
           >
             <ListItemText
@@ -90,6 +95,8 @@ export function FamilyRail() {
                   <LinearProgress
                     variant="determinate"
                     value={stat.progress}
+                    aria-label={`${stat.id} completeness`}
+                    aria-valuetext={`${stat.complete} of ${stat.inBaseline} controls complete`}
                     sx={{ mt: 0.75, height: 4, borderRadius: 2 }}
                   />
                 </Box>
